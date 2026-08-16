@@ -1,0 +1,68 @@
+import '../theme/app_colors.dart';
+
+/// A rentable toy in the catalog.
+class Toy {
+  Toy({
+    required this.id,
+    required this.name,
+    required this.qty,
+    required this.blockMin,
+    required this.price,
+    required this.ink,
+    required this.imageKey,
+  });
+
+  final String id;
+  final String name;
+  final int qty;
+  final int blockMin;
+  final double price;
+  final ToyInk ink;
+
+  /// Which illustration (`assets/images/toy-<imageKey>.png`) represents
+  /// this toy — picked from [kToyIconOptions], independent of [id] so
+  /// two custom toys can share the same picture.
+  final String imageKey;
+
+  Toy copyWith({int? blockMin, double? price}) => Toy(
+        id: id,
+        name: name,
+        qty: qty,
+        blockMin: blockMin ?? this.blockMin,
+        price: price ?? this.price,
+        ink: ink,
+        imageKey: imageKey,
+      );
+}
+
+/// Seed catalog, mirroring `TOYS_INIT` in the original design script.
+final List<Toy> kInitialToys = [
+  Toy(id: 'carrinho', name: 'Carrinho Elétrico c/ Controle', qty: 2, blockMin: 15, price: 10, ink: ToyInk.cyan, imageKey: 'carrinho'),
+  Toy(id: 'cama', name: 'Cama Elástica', qty: 1, blockMin: 30, price: 15, ink: ToyInk.magenta, imageKey: 'cama'),
+  Toy(id: 'pula', name: 'Pula-Pula', qty: 2, blockMin: 30, price: 12, ink: ToyInk.yellow, imageKey: 'pula'),
+  Toy(id: 'piscina', name: 'Piscina de Bolinha', qty: 1, blockMin: 20, price: 10, ink: ToyInk.cyan, imageKey: 'piscina'),
+  Toy(id: 'patinete', name: 'Patinete Elétrico', qty: 2, blockMin: 15, price: 12, ink: ToyInk.magenta, imageKey: 'patinete'),
+];
+
+/// One illustration option offered in the "novo brinquedo" icon picker.
+class ToyIconOption {
+  const ToyIconOption(this.key, this.label);
+  final String key;
+  final String label;
+  String get asset => 'assets/images/toy-$key.png';
+}
+
+const kToyIconOptions = <ToyIconOption>[
+  ToyIconOption('carrinho', 'Carrinho'),
+  ToyIconOption('cama', 'Cama elástica'),
+  ToyIconOption('pula', 'Pula-pula'),
+  ToyIconOption('piscina', 'Piscina'),
+  ToyIconOption('patinete', 'Patinete'),
+  ToyIconOption('kart', 'Kart'),
+  ToyIconOption('cavalinho', 'Cavalinho'),
+  ToyIconOption('quadriciclo', 'Quadriciclo'),
+  ToyIconOption('tobogan', 'Tobogã'),
+  ToyIconOption('touro', 'Touro mecânico'),
+  ToyIconOption('trenzinho', 'Trenzinho'),
+  ToyIconOption('outro', 'Outro'),
+];
