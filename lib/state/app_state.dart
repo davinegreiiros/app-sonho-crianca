@@ -37,6 +37,12 @@ class RentalDraft {
   /// [price] above are still kept in sync with the current toy (so no
   /// non-nullable field goes stale) but the UI doesn't show or use them.
   bool openEnded = false;
+
+  /// Operator-chosen R$/min for a tempo-corrido rental — `null` means "use
+  /// the toy's own price/blockMin rate", the pre-filled suggestion. Reset
+  /// whenever the toy changes ([AppState.setDraftToy]), since a rate
+  /// typed for one toy isn't meant to carry over to a different one.
+  double? customRatePerMinute;
 }
 
 /// Central app state, ported from the original `.dc.html` Component logic:
@@ -227,6 +233,7 @@ class AppState extends ChangeNotifier {
     draft.toyId = toyId;
     draft.durationMin = t.blockMin;
     draft.price = t.price;
+    draft.customRatePerMinute = null; // a rate typed for the old toy doesn't carry over
     notifyListeners();
   }
 
@@ -263,21 +270,32 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Price per minute a toy earns, derived from its own block — the only
-  /// rate a "tempo corrido" (open-ended) rental uses.
+  void setDraftCustomRate(double? v) {
+    draft.customRatePerMinute = v;
+    notifyListeners();
+  }
+
+  /// Price per minute a toy earns, derived from its own block — the
+  /// *suggested* rate a tempo-corrido rental pre-fills with. The operator
+  /// can override it per rental (`RentalDraft.customRatePerMinute`); once
+  /// the rental is created, [Rental.ratePerMinute] is what actually gets
+  /// charged (see [computeFinalPrice]), not this.
   double ratePerMinute(Toy t) => t.price / t.blockMin;
 
   /// The price a rental should charge right now: the fixed [Rental.price]
   /// for a normal rental, or the live/final tempo-corrido estimate
-  /// (elapsed minutes × [ratePerMinute], rounded to the cent) for an
-  /// open-ended one. Used both by the active-rental card (live estimate)
-  /// and by [confirmEnd] (the actual amount charged) so the two can never
+  /// (elapsed minutes × the rate captured on the rental itself, rounded
+  /// to the cent) for an open-ended one. Falls back to the toy's derived
+  /// rate only if the rental predates `Rental.ratePerMinute` existing
+  /// (older data/tests) — a rental created today always has one set.
+  /// Used both by the active-rental card (live estimate) and by
+  /// [confirmEnd] (the actual amount charged) so the two can never
   /// diverge — same formula, same call.
   double computeFinalPrice(Rental r) {
     if (!r.isOpenEnded) return r.price;
-    final toy = toyById(r.toyId);
+    final rate = r.ratePerMinute ?? ratePerMinute(toyById(r.toyId));
     final elapsedMin = DateTime.now().difference(r.startedAt).inMilliseconds / 60000;
-    final raw = ratePerMinute(toy) * elapsedMin;
+    final raw = rate * elapsedMin;
     return (raw * 100).round() / 100;
   }
 
@@ -294,6 +312,9 @@ class AppState extends ChangeNotifier {
       durationMin: d.openEnded ? null : d.durationMin,
       price: d.openEnded ? 0 : d.price,
       status: RentalStatus.active,
+      // Captured once, here — never re-derived from the toy later (see
+      // the field's doc on `Rental`).
+      ratePerMinute: d.openEnded ? (d.customRatePerMinute ?? ratePerMinute(toyById(d.toyId))) : null,
     );
     rentals.add(rental);
     _scheduleEndNotification(rental);

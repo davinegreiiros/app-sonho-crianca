@@ -24,6 +24,7 @@ class Rental {
     required this.status,
     this.endedAt,
     this.paymentMethod,
+    this.ratePerMinute,
   });
 
   final String id;
@@ -37,6 +38,17 @@ class Rental {
   /// no fixed duration, the price is computed from elapsed time when it's
   /// finished instead of being fixed at creation.
   final int? durationMin;
+
+  /// R$/min this open-ended rental charges — captured once at creation
+  /// (the operator's chosen rate, defaulting to the toy's `price/blockMin`
+  /// but editable, spec 006 amendment), never re-derived from the toy
+  /// later. That matters: if the catalog price/duration for this toy gets
+  /// edited while the rental is still running, this rental keeps earning
+  /// at the rate it started with, not a rate that silently shifted under
+  /// it. `null` for a fixed-duration rental (not applicable) — see
+  /// `AppState.computeFinalPrice` for the fallback used when this is
+  /// unset on an open-ended rental (older data, tests).
+  final double? ratePerMinute;
 
   /// Fixed at creation for a normal rental. For an open-ended one it
   /// starts at `0` (never shown — the UI reads the live estimate off

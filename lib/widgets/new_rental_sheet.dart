@@ -113,18 +113,34 @@ class NewRentalSheet extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               if (draft.openEnded) ...[
-                const _FieldLabel('Cobrado por minuto, no valor de:'),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                  child: Text(
-                    '${state.fmtMoney(state.ratePerMinute(state.toyById(draft.toyId)))}/min · calculado ao finalizar',
-                    style: const TextStyle(fontSize: 13, color: AppColors.text),
-                  ),
-                ),
+                Builder(builder: (context) {
+                  final toy = state.toyById(draft.toyId);
+                  final suggested = state.ratePerMinute(toy);
+                  final effective = draft.customRatePerMinute ?? suggested;
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const _FieldLabel('Taxa por minuto (R\$) — calculado ao finalizar'),
+                      _TextInput(
+                        // Remounts (fresh `initialValue`) whenever the toy
+                        // changes or the operator picks a new rate — same
+                        // pattern the duration/price fields above use.
+                        key: ValueKey('rate-${draft.toyId}-$effective'),
+                        initial: effective.toStringAsFixed(2),
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        onChanged: (v) {
+                          final n = double.tryParse(v.replaceAll(',', '.'));
+                          if (n != null && n > 0) state.setDraftCustomRate(n);
+                        },
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'sugestão do catálogo: ${state.fmtMoney(suggested)}/min',
+                        style: TextStyle(fontSize: 11, color: AppColors.text.withValues(alpha: 0.55)),
+                      ),
+                    ],
+                  );
+                }),
               ] else ...[
                 const _FieldLabel('Tempo (minutos)'),
                 const SizedBox(height: 6),

@@ -76,6 +76,69 @@ void main() {
     });
   });
 
+  group('customizable tempo-corrido rate', () {
+    testWidgets('a custom rate overrides the catalog-derived one and is what actually charges', (tester) async {
+      await tester.pumpWidget(const SonhoDeCriancaApp());
+      await tester.pump(const Duration(milliseconds: 400));
+      final state = Provider.of<AppState>(tester.element(find.byType(MaterialApp)), listen: false);
+
+      state.openNew();
+      state.setDraftToy('cama'); // catalog-derived: 0.50/min
+      state.setDraftChild('Taxa Custom');
+      state.setDraftOpenEnded(true);
+      state.setDraftCustomRate(1.20); // operator overrides
+      state.submitNew();
+
+      final rental = state.rentals.firstWhere((r) => r.childName == 'Taxa Custom');
+      expect(rental.ratePerMinute, 1.20);
+
+      final index = state.rentals.indexWhere((r) => r.id == rental.id);
+      state.rentals[index] = Rental(
+        id: rental.id,
+        toyId: rental.toyId,
+        childName: rental.childName,
+        guardianName: rental.guardianName,
+        startedAt: DateTime.now().subtract(const Duration(minutes: 10)),
+        durationMin: null,
+        price: 0,
+        status: RentalStatus.active,
+        ratePerMinute: rental.ratePerMinute,
+      );
+
+      // 10min at R$1,20/min — not the R$0,50/min the catalog would suggest.
+      expect(state.computeFinalPrice(state.rentals.firstWhere((r) => r.id == rental.id)), 12.0);
+    });
+
+    testWidgets('without an override, the rate still falls back to the catalog default', (tester) async {
+      await tester.pumpWidget(const SonhoDeCriancaApp());
+      await tester.pump(const Duration(milliseconds: 400));
+      final state = Provider.of<AppState>(tester.element(find.byType(MaterialApp)), listen: false);
+
+      state.openNew();
+      state.setDraftToy('cama'); // 0.50/min
+      state.setDraftChild('Taxa Padrao');
+      state.setDraftOpenEnded(true);
+      state.submitNew();
+
+      final rental = state.rentals.firstWhere((r) => r.childName == 'Taxa Padrao');
+      expect(rental.ratePerMinute, 0.5);
+    });
+
+    testWidgets('switching the toy clears a previously typed custom rate', (tester) async {
+      await tester.pumpWidget(const SonhoDeCriancaApp());
+      await tester.pump(const Duration(milliseconds: 400));
+      final state = Provider.of<AppState>(tester.element(find.byType(MaterialApp)), listen: false);
+
+      state.openNew();
+      state.setDraftToy('cama');
+      state.setDraftCustomRate(9.99);
+      expect(state.draft.customRatePerMinute, 9.99);
+
+      state.setDraftToy('pula');
+      expect(state.draft.customRatePerMinute, isNull);
+    });
+  });
+
   group('open-ended rental flow', () {
     testWidgets('creating, then finishing, an open-ended rental charges the computed price', (tester) async {
       await tester.pumpWidget(const SonhoDeCriancaApp());
