@@ -1,6 +1,6 @@
 # Spec: Locação em tempo corrido (sem tempo fixo, valor calculado no fim)
 
-Status: Draft
+Status: Implemented
 Criado: 2026-08-15
 
 ## Problema
@@ -44,8 +44,10 @@ Qualquer brinquedo pode ser alugado em modo "tempo corrido": sem duração pré-
 
 - Cálculo de valor é sensível a centavo — usar arredondamento consistente (`round()`/`toStringAsFixed`) igual o resto do app já faz em `fmtMoney`/`applyDuration`, não introduzir uma segunda convenção de arredondamento no código.
 
-## Dúvidas em aberto
+## Decisões registradas (2026-08-16)
 
-- Tempo corrido tem um valor mínimo (ex: nunca cobra menos que 1 bloco `blockMin` mesmo que a criança saia em 2 min), ou é sempre proporcional desde o segundo 1?
-- Existe um teto (ex: nunca passa do "preço se fosse o dia todo") ou é ilimitado enquanto o brinquedo estiver com aquela locação?
-- Isso se aplica a todo brinquedo do catálogo (qualquer um pode virar tempo corrido na hora de alugar) ou só a alguns marcados como "elegíveis pra tempo corrido" no cadastro?
+- **Elegibilidade:** qualquer brinquedo do catálogo pode virar tempo corrido na hora de alugar — não é uma propriedade do `Toy` cadastrado, é uma escolha por locação, feita em `NewRentalSheet`. Sem campo novo em `Toy`.
+- **Valor mínimo:** nenhum — proporcional desde o segundo 1 (2 min ficados = 2 min cobrados, fração exata em centavos, ver critério de aceite acima).
+- **Teto:** nenhum — cobra o tempo todo que a locação ficar aberta, sem limite superior. Se isso virar problema na prática (ex: criança esquecida com o brinquedo por horas), é ajuste de UX pra outra spec, não desta.
+
+Sem dúvida em aberto pendente — spec pronta pra `plan.md`.

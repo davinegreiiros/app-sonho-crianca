@@ -6,6 +6,8 @@ import '../state/app_state.dart';
 import '../test_keys.dart';
 import '../theme/app_colors.dart';
 import 'animations/pressable.dart';
+import 'modal_launchers.dart';
+import 'pix_qr_sheet.dart';
 
 /// "Finalizar locação" confirmation card: picks a payment method, then
 /// commits the rental as done. Layout ported 1:1 from the design source's
@@ -27,9 +29,11 @@ class EndRentalDialog extends StatelessWidget {
       }
     }
     if (rental == null) return const SizedBox.shrink();
+    if (state.endShowPixQr) return PixQrSheet(rentalId: rental.id);
     final toy = state.toyById(rental.toyId);
+    final finalPrice = state.computeFinalPrice(rental);
     final summary =
-        '${toy.name} · ${rental.childName} · ${state.fmtMoney(rental.price)}';
+        '${toy.name} · ${rental.childName} · ${state.fmtMoney(finalPrice)}';
     final canConfirm = state.endPayment != null;
 
     // `showGeneralDialog` (unlike `showModalBottomSheet`) doesn't wrap its
@@ -140,6 +144,23 @@ class EndRentalDialog extends StatelessWidget {
                             key: TestKeys.confirmEndButton,
                             onPressed: canConfirm
                                 ? () {
+                                    // Pix (spec 004): show the QR before actually
+                                    // committing — same dialog route, so it never
+                                    // races with `closeEnd()` resetting the ids
+                                    // this needs once the QR step confirms.
+                                    if (state.endPayment == PaymentMethod.pix) {
+                                      if (!state.businessSettings.isConfigured) {
+                                        state.closeEnd();
+                                        Navigator.of(context).pop();
+                                        showBusinessSettingsSheet(
+                                          context,
+                                          hint: 'Configure isso antes de cobrar por Pix.',
+                                        );
+                                        return;
+                                      }
+                                      state.showPixQrStep();
+                                      return;
+                                    }
                                     state.confirmEnd();
                                     Navigator.of(context).pop();
                                   }

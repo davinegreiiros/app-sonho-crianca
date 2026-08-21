@@ -1,4 +1,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Local rental-end notifications (specs/005-notificacoes-locais).
+         Runtime-requested on first real schedule, not at app boot — see
+         `LocalRentalNotifier.init()`. No exact-alarm permission: scheduling
+         uses `inexactAllowWhileIdle`, which doesn't need one (see
+         specs/002-seguranca-dados for why the extra permission was
+         deliberately skipped). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
         android:label="sonho_de_crianca"
         android:name="${applicationName}"

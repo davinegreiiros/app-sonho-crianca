@@ -1,6 +1,6 @@
 # Spec: Notificações locais de fim de locação
 
-Status: Draft
+Status: Approved (código completo — pendente validação manual em device, ver `tasks.md` T10)
 Criado: 2026-08-15
 Depende de: [specs/002-seguranca-dados/spec.md](../002-seguranca-dados/spec.md)
 
@@ -45,7 +45,9 @@ Quando o tempo de uma locação ativa termina, o app dispara uma notificação l
 - Permissão `POST_NOTIFICATIONS` (Android 13+) e, se o agendamento exigir, `SCHEDULE_EXACT_ALARM`/`USE_EXACT_ALARM` — ambas revisadas contra `002-seguranca-dados` antes de entrar no manifest.
 - iOS: `UNUserNotificationCenter` — permissão pedida com o mesmo cuidado de timing (não no boot).
 
-## Dúvidas em aberto
+## Decisões registradas (2026-08-16)
 
-- Som/vibração da notificação — usar o padrão do sistema ou precisa de algo customizado?
-- Quando o app está com a locação já vencida e o usuário abre o app depois (ex: notificação foi ignorada), precisa de algum resumo tipo "3 locações vencidas enquanto você estava fora", ou a aba "Em andamento" já mostrando vermelho/overtime já resolve?
+- **Som/vibração:** padrão do sistema (canal Android sem som/vibração customizados) — menos código, menos superfície de bug, consistente com o resto do SO do operador.
+- **Resumo de vencidas:** não é feature desta spec — a aba "Em andamento" já mostra overtime em vermelho/pulsando (`statusColor`/`pulseOnOvertime`), isso já resolve. Se no uso real não bastar, é spec própria depois.
+
+Sem dúvida em aberto pendente.

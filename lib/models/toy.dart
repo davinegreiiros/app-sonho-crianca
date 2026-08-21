@@ -1,5 +1,21 @@
 import '../theme/app_colors.dart';
 
+/// Fixed set of toy categories — every toy (seed or user-added) declares
+/// one, shown as a tag on its catalog card. Closed list decided in
+/// `specs/003-catalogo-tickets-tipo/spec.md`.
+enum ToyCategory { eletrico, inflavel, passeio, aquatico, radiocontrole, outro }
+
+extension ToyCategoryLabel on ToyCategory {
+  String get label => switch (this) {
+        ToyCategory.eletrico => 'Elétrico',
+        ToyCategory.inflavel => 'Insuflável',
+        ToyCategory.passeio => 'Passeio',
+        ToyCategory.aquatico => 'Aquático',
+        ToyCategory.radiocontrole => 'Rádio-controle',
+        ToyCategory.outro => 'Outro',
+      };
+}
+
 /// A rentable toy in the catalog.
 class Toy {
   Toy({
@@ -10,6 +26,7 @@ class Toy {
     required this.price,
     required this.ink,
     required this.imageKey,
+    required this.category,
   });
 
   final String id;
@@ -18,6 +35,7 @@ class Toy {
   final int blockMin;
   final double price;
   final ToyInk ink;
+  final ToyCategory category;
 
   /// Which illustration (`assets/images/toy-<imageKey>.png`) represents
   /// this toy — picked from [kToyIconOptions], independent of [id] so
@@ -32,16 +50,17 @@ class Toy {
         price: price ?? this.price,
         ink: ink,
         imageKey: imageKey,
+        category: category,
       );
 }
 
 /// Seed catalog, mirroring `TOYS_INIT` in the original design script.
 final List<Toy> kInitialToys = [
-  Toy(id: 'carrinho', name: 'Carrinho Elétrico c/ Controle', qty: 2, blockMin: 15, price: 10, ink: ToyInk.cyan, imageKey: 'carrinho'),
-  Toy(id: 'cama', name: 'Cama Elástica', qty: 1, blockMin: 30, price: 15, ink: ToyInk.magenta, imageKey: 'cama'),
-  Toy(id: 'pula', name: 'Pula-Pula', qty: 2, blockMin: 30, price: 12, ink: ToyInk.yellow, imageKey: 'pula'),
-  Toy(id: 'piscina', name: 'Piscina de Bolinha', qty: 1, blockMin: 20, price: 10, ink: ToyInk.cyan, imageKey: 'piscina'),
-  Toy(id: 'patinete', name: 'Patinete Elétrico', qty: 2, blockMin: 15, price: 12, ink: ToyInk.magenta, imageKey: 'patinete'),
+  Toy(id: 'carrinho', name: 'Carrinho Elétrico c/ Controle', qty: 2, blockMin: 15, price: 10, ink: ToyInk.cyan, imageKey: 'carrinho', category: ToyCategory.eletrico),
+  Toy(id: 'cama', name: 'Cama Elástica', qty: 1, blockMin: 30, price: 15, ink: ToyInk.magenta, imageKey: 'cama', category: ToyCategory.inflavel),
+  Toy(id: 'pula', name: 'Pula-Pula', qty: 2, blockMin: 30, price: 12, ink: ToyInk.yellow, imageKey: 'pula', category: ToyCategory.inflavel),
+  Toy(id: 'piscina', name: 'Piscina de Bolinha', qty: 1, blockMin: 20, price: 10, ink: ToyInk.cyan, imageKey: 'piscina', category: ToyCategory.aquatico),
+  Toy(id: 'patinete', name: 'Patinete Elétrico', qty: 2, blockMin: 15, price: 12, ink: ToyInk.magenta, imageKey: 'patinete', category: ToyCategory.eletrico),
 ];
 
 /// One illustration option offered in the "novo brinquedo" icon picker.

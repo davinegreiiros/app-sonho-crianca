@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../state/app_state.dart';
+import '../test_keys.dart';
 import '../theme/app_colors.dart';
 import 'animations/bounce.dart';
 import 'animations/print_strip.dart';
+import 'modal_launchers.dart';
 
 /// Gradient header: CMY logo mark, brand name, location kicker, screen
 /// title and the three status dots — ported from the design's header block.
@@ -59,6 +61,16 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
                     letterSpacing: 1,
                     color: AppColors.text.withValues(alpha: 0.6),
                   ),
+                ),
+              ),
+              const SizedBox(width: 4),
+              InkWell(
+                key: TestKeys.settingsGearButton,
+                borderRadius: BorderRadius.circular(20),
+                onTap: () => showBusinessSettingsSheet(context),
+                child: Padding(
+                  padding: const EdgeInsets.all(4),
+                  child: Icon(Icons.settings_outlined, size: 18, color: AppColors.text.withValues(alpha: 0.6)),
                 ),
               ),
             ],

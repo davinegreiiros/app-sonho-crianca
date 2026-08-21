@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../models/toy.dart';
 import '../../state/app_state.dart';
+import '../../test_keys.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/animations/cascade.dart';
 import '../../widgets/animations/pressable.dart';
@@ -18,11 +19,11 @@ class CatalogTab extends StatefulWidget {
 }
 
 class _CatalogTabState extends State<CatalogTab> with TickerProviderStateMixin {
-  // Text/tag/inputs block below the image is a fixed height regardless of
-  // column width, so the card's aspect ratio has to be derived from the
-  // actual column width rather than guessed — otherwise it overflows on
-  // narrower screens (see _ToyCard for what this height covers).
-  static const double _contentHeight = 150;
+  // Text/tag/tickets/inputs block below the image is a fixed height
+  // regardless of column width, so the card's aspect ratio has to be
+  // derived from the actual column width rather than guessed — otherwise
+  // it overflows on narrower screens (see _ToyCard for what this covers).
+  static const double _contentHeight = 180;
 
   CascadeController? _cascade;
   int _lastCount = -1;
@@ -107,6 +108,7 @@ class _ToyCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final avail = state.toyAvailable(toy);
     return Container(
+      key: TestKeys.toyCardKey(toy.id),
       decoration: BoxDecoration(
         color: toy.ink.tint,
         borderRadius: BorderRadius.circular(4),
@@ -163,21 +165,9 @@ class _ToyCard extends StatelessWidget {
                   style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, height: 1.2),
                 ),
                 const SizedBox(height: 5),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: AppColors.bg.withValues(alpha: 0.7),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                  child: Text(
-                    avail > 0 ? '$avail livre${avail != 1 ? 's' : ''}' : 'todos em uso',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: avail > 0 ? toy.ink.fg : AppColors.accent2_700,
-                    ),
-                  ),
-                ),
+                _Tag(text: toy.category.label, color: toy.ink.fg),
+                const SizedBox(height: 6),
+                _AvailabilityTickets(toy: toy, avail: avail),
                 const SizedBox(height: 8),
                 Row(
                   children: [
@@ -213,6 +203,110 @@ class _ToyCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _Tag extends StatelessWidget {
+  const _Tag({required this.text, required this.color});
+  final String text;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: AppColors.bg.withValues(alpha: 0.7),
+        borderRadius: BorderRadius.circular(2),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: color),
+      ),
+    );
+  }
+}
+
+/// One ticket-stub per unit of [Toy.qty] (raffle-ticket look: small
+/// rounded rectangle with a perforation notch punched on each side),
+/// filled for a free unit and dimmed/outlined for one in use. Caps at
+/// [_maxVisible] and folds the rest into a "+N" label so a high `qty`
+/// never overflows the card.
+class _AvailabilityTickets extends StatelessWidget {
+  const _AvailabilityTickets({required this.toy, required this.avail});
+  final Toy toy;
+  final int avail;
+
+  static const _maxVisible = 6;
+
+  @override
+  Widget build(BuildContext context) {
+    final inUse = toy.qty - avail;
+    final visible = toy.qty > _maxVisible ? _maxVisible : toy.qty;
+    final overflow = toy.qty - visible;
+    return Row(
+      children: [
+        for (var i = 0; i < visible; i++) ...[
+          if (i != 0) const SizedBox(width: 3),
+          _TicketStub(free: i >= inUse, ink: toy.ink),
+        ],
+        if (overflow > 0) ...[
+          const SizedBox(width: 4),
+          Text(
+            '+$overflow',
+            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: toy.ink.fg),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _TicketStub extends StatelessWidget {
+  const _TicketStub({required this.free, required this.ink});
+  final bool free;
+  final ToyInk ink;
+
+  static const _w = 14.0;
+  static const _h = 16.0;
+  static const _notch = 3.0;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: _w,
+      height: _h,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              color: free ? ink.dot : Colors.transparent,
+              borderRadius: BorderRadius.circular(2),
+              border: Border.all(color: free ? ink.dot : AppColors.text.withValues(alpha: 0.3), width: 1),
+            ),
+          ),
+          // Perforation notches, colored like the card body so they read
+          // as punched-out half-circles on the ticket's long edges.
+          Positioned(
+            left: -_notch / 2,
+            top: (_h - _notch) / 2,
+            child: _notchDot(),
+          ),
+          Positioned(
+            right: -_notch / 2,
+            top: (_h - _notch) / 2,
+            child: _notchDot(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _notchDot() => Container(
+        width: _notch,
+        height: _notch,
+        decoration: BoxDecoration(color: ink.tint, shape: BoxShape.circle),
+      );
 }
 
 void _confirmRemove(BuildContext context, AppState state, Toy toy) {

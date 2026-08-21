@@ -1,6 +1,6 @@
 # Spec: Catálogo — disponibilidade em "tickets" + tipo obrigatório do brinquedo
 
-Status: Draft
+Status: Implemented
 Criado: 2026-08-15
 
 ## Problema
@@ -44,12 +44,15 @@ O card do catálogo mostra a disponibilidade como uma fileira de "tickets" (um p
 Pedido: gerar mais imagens de brinquedo seguindo a mesma estrutura visual das 12 já existentes em `assets/images/toy-*.png`, alinhadas ao design system que a spec `001-tema-layout-parity` documenta.
 
 Não tenho ferramenta de geração de imagem disponível nesta sessão pra criar arte nova nesse estilo. Caminhos possíveis:
+
 1. Você gera as ilustrações via Claude Design (mesmo projeto `.dc.html`) numa sessão interativa e me passa os arquivos — eu cuido de nomear (`toy-<key>.png`), registrar em `kToyIconOptions` e cablar no picker do `AddToySheet`, que já é 100% orientado a dado (nenhuma mudança estrutural necessária).
 2. Você já tem os arquivos prontos — só me diz onde estão e eu integro.
 
 Isso fica como task bloqueada em `tasks.md` até um dos dois caminhos acontecer — o resto da spec (tickets + tipo) não depende disso e pode seguir sozinho.
 
-## Dúvidas em aberto
+## Decisões registradas (2026-08-16)
 
-- Lista fechada de categorias: proponho `eletrico`, `inflavel`, `passeio`, `aquatico`, `radiocontrole`, `outro` — confirma ou ajusta?
-- Limite de tickets visíveis antes do `+N`: baseado em quantas unidades reais o negócio costuma ter por brinquedo hoje (a maioria é 1–2)? Se sim, um limite baixo tipo 6 já cobre folgado.
+- **Categorias:** `eletrico`, `inflavel`, `passeio`, `aquatico`, `radiocontrole`, `outro`. Mapeamento dos 5 seeds: `carrinho`→`eletrico`, `cama`→`inflavel`, `pula`→`inflavel`, `piscina`→`aquatico`, `patinete`→`eletrico`.
+- **Limite de tickets visíveis:** 6, acima disso mostra `+N` — cobre folgado o padrão hoje (maioria 1–2 unidades por brinquedo).
+
+Sem dúvida em aberto pendente, exceto o item de assets novos (ver seção acima, depende de você).
