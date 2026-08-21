@@ -10,7 +10,7 @@ enum ToyCategory { eletrico, inflavel, passeio, aquatico, radiocontrole, outro }
 extension ToyCategoryLabel on ToyCategory {
   String get label => switch (this) {
         ToyCategory.eletrico => 'Elétrico',
-        ToyCategory.inflavel => 'Insuflável',
+        ToyCategory.inflavel => 'Inflavel',
         ToyCategory.passeio => 'Passeio',
         ToyCategory.aquatico => 'Aquático',
         ToyCategory.radiocontrole => 'Rádio-controle',
@@ -85,11 +85,51 @@ class Toy {
 
 /// Seed catalog, mirroring `TOYS_INIT` in the original design script.
 final List<Toy> kInitialToys = [
-  Toy(id: 'carrinho', name: 'Carrinho Elétrico c/ Controle', qty: 2, blockMin: 15, price: 10, ink: ToyInk.cyan, imageKey: 'carrinho', category: ToyCategory.eletrico),
-  Toy(id: 'cama', name: 'Cama Elástica', qty: 1, blockMin: 30, price: 15, ink: ToyInk.magenta, imageKey: 'cama', category: ToyCategory.inflavel),
-  Toy(id: 'pula', name: 'Pula-Pula', qty: 2, blockMin: 30, price: 12, ink: ToyInk.yellow, imageKey: 'pula', category: ToyCategory.inflavel),
-  Toy(id: 'piscina', name: 'Piscina de Bolinha', qty: 1, blockMin: 20, price: 10, ink: ToyInk.cyan, imageKey: 'piscina', category: ToyCategory.aquatico),
-  Toy(id: 'patinete', name: 'Patinete Elétrico', qty: 2, blockMin: 15, price: 12, ink: ToyInk.magenta, imageKey: 'patinete', category: ToyCategory.eletrico),
+  Toy(
+      id: 'carrinho',
+      name: 'Carrinho Elétrico c/ Controle',
+      qty: 2,
+      blockMin: 15,
+      price: 10,
+      ink: ToyInk.cyan,
+      imageKey: 'carrinho',
+      category: ToyCategory.eletrico),
+  Toy(
+      id: 'cama',
+      name: 'Cama Elástica',
+      qty: 1,
+      blockMin: 30,
+      price: 15,
+      ink: ToyInk.magenta,
+      imageKey: 'cama',
+      category: ToyCategory.inflavel),
+  Toy(
+      id: 'pula',
+      name: 'Pula-Pula',
+      qty: 2,
+      blockMin: 30,
+      price: 12,
+      ink: ToyInk.yellow,
+      imageKey: 'pula',
+      category: ToyCategory.inflavel),
+  Toy(
+      id: 'piscina',
+      name: 'Piscina de Bolinha',
+      qty: 1,
+      blockMin: 20,
+      price: 10,
+      ink: ToyInk.cyan,
+      imageKey: 'piscina',
+      category: ToyCategory.aquatico),
+  Toy(
+      id: 'patinete',
+      name: 'Patinete Elétrico',
+      qty: 2,
+      blockMin: 15,
+      price: 12,
+      ink: ToyInk.magenta,
+      imageKey: 'patinete',
+      category: ToyCategory.eletrico),
 ];
 
 /// One illustration option offered in the "novo brinquedo" icon picker.

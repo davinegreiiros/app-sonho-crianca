@@ -7,7 +7,7 @@ Criado: 2026-08-15
 
 Hoje o card de cada brinquedo em "Brinquedos" (`lib/screens/tabs/catalog_tab.dart:172`) mostra disponibilidade como texto: `"2 livres"` / `"todos em uso"`. Funciona, mas é só número — não dá a leitura visual rápida de "quantas unidades tenho, quantas estão em uso agora" que o dono do negócio quer numa banca com o pátio cheio.
 
-Também não existe hoje nenhum campo de **tipo/categoria** no brinquedo (`lib/models/toy.dart`) — só nome, ícone, preço, duração e quantidade. Ao cadastrar um brinquedo novo (`AddToySheet`) não se declara que *tipo* de brinquedo é (elétrico, insuflável, passeio, aquático, etc.), então o catálogo não consegue nunca ser filtrado/agrupado por tipo nem mostrar essa informação no card.
+Também não existe hoje nenhum campo de **tipo/categoria** no brinquedo (`lib/models/toy.dart`) — só nome, ícone, preço, duração e quantidade. Ao cadastrar um brinquedo novo (`AddToySheet`) não se declara que *tipo* de brinquedo é (elétrico, inflavel, passeio, aquático, etc.), então o catálogo não consegue nunca ser filtrado/agrupado por tipo nem mostrar essa informação no card.
 
 ## Objetivo
 
