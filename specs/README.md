@@ -26,9 +26,9 @@ Sem `spec.md` aprovado, sem código de feature. Bugfix simples e chore não prec
 |---|---|---|---|
 | [001](001-tema-layout-parity/spec.md) | Tema e paridade de layout com o design source | Implemented | — |
 | [002](002-seguranca-dados/spec.md) | Segurança e proteção de dados | Draft | — (cross-cutting, bloqueia 004/005) |
-| [003](003-catalogo-tickets-tipo/spec.md) | Catálogo — tickets de disponibilidade + tipo do brinquedo | Draft | 001 |
-| [004](004-pix-qrcode/spec.md) | QR Code Pix na finalização de locação | Draft | 002 |
-| [005](005-notificacoes-locais/spec.md) | Notificações locais de fim de locação | Draft | 002 |
-| [006](006-locacao-tempo-corrido/spec.md) | Locação em tempo corrido | Draft | — |
+| [003](003-catalogo-tickets-tipo/spec.md) | Catálogo — tickets de disponibilidade + tipo do brinquedo | Implemented | 001 |
+| [004](004-pix-qrcode/spec.md) | QR Code Pix na finalização de locação | Implemented | 002 |
+| [005](005-notificacoes-locais/spec.md) | Notificações locais de fim de locação | Código completo, falta validar em device | 002 |
+| [006](006-locacao-tempo-corrido/spec.md) | Locação em tempo corrido | Implemented | — |
 
 Todas em `Draft` — cada uma tem "Dúvidas em aberto" que precisa de resposta sua antes de virar `Approved` e ganhar `plan.md`/`tasks.md`.

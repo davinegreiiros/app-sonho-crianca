@@ -25,4 +25,20 @@ class TestKeys {
 
   static const confirmEndButton = ValueKey('confirm_end_button');
   static ValueKey paymentOption(String method) => ValueKey('payment_option_$method');
+
+  static ValueKey toyCardKey(String toyId) => ValueKey('toy_card_$toyId');
+  static const addToySubmitButton = ValueKey('add_toy_submit_button');
+  static ValueKey categoryOption(String category) => ValueKey('category_option_$category');
+
+  static const rentalModeFixed = ValueKey('rental_mode_fixed');
+  static const rentalModeOpenEnded = ValueKey('rental_mode_open_ended');
+
+  static const settingsGearButton = ValueKey('settings_gear_button');
+  static const businessNameField = ValueKey('business_name_field');
+  static const businessCityField = ValueKey('business_city_field');
+  static const businessPixKeyField = ValueKey('business_pix_key_field');
+  static const saveBusinessSettingsButton = ValueKey('save_business_settings_button');
+  static const pixQrImage = ValueKey('pix_qr_image');
+  static const copyPixPayloadButton = ValueKey('copy_pix_payload_button');
+  static const pixQrDoneButton = ValueKey('pix_qr_done_button');
 }

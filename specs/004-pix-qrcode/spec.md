@@ -1,6 +1,6 @@
 # Spec: QR Code Pix na finalização de locação
 
-Status: Draft
+Status: Implemented
 Criado: 2026-08-15
 Depende de: [specs/002-seguranca-dados/spec.md](../002-seguranca-dados/spec.md) (chave Pix, payload local, sem log)
 
@@ -43,8 +43,10 @@ Quando o operador escolhe "Pix" pra finalizar uma locação, o app mostra um QR 
 
 Ver `specs/002-seguranca-dados/spec.md` — chave Pix nunca no git, payload montado localmente sem chamada externa, QR não persiste nem loga.
 
-## Dúvidas em aberto
+## Decisões registradas (2026-08-16)
 
-- Chave Pix é CPF, CNPJ, telefone, e-mail ou chave aleatória? Isso muda só o formato do campo, não a estrutura do payload.
-- "Configurar Pix" vira uma aba/tela nova de "Configurações", ou entra dentro de alguma aba existente (ex: Faturamento)? Hoje o app não tem nenhuma tela de config — isso é a primeira.
-- Depois de mostrar o QR, o app deve também oferecer o "Pix copia e cola" como texto (pra colar manualmente se o responsável não conseguir escanear), ou só o QR já resolve?
+- **Formato da chave:** campo de texto livre (CPF/CNPJ/telefone/e-mail/aleatória são todos strings no payload BR Code — a estrutura não muda por tipo). Sem validação de formato específico na v1, só "não vazio".
+- **Onde fica "Configurar Pix":** não vira aba nova (bottom nav continua com 4 abas, sem mexer no layout já auditado em `001`) — entra como ícone de engrenagem no `AppHeader`, abrindo uma tela/sheet de configurações. Primeira tela de config do app.
+- **Copia e cola:** sim, mostra o texto do payload junto do QR (com botão de copiar) — cobre responsável que não consegue escanear.
+
+Sem dúvida em aberto pendente.

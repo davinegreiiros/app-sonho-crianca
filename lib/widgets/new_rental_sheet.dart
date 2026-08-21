@@ -84,45 +84,88 @@ class NewRentalSheet extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 12),
-              const _FieldLabel('Tempo (minutos)'),
+              const _FieldLabel('Cobrança'),
               const SizedBox(height: 6),
               Row(
                 children: [
-                  for (final m in presets) ...[
-                    if (m != presets.first) const SizedBox(width: 8),
-                    Expanded(
-                      child: Pressable(
-                        child: _PresetButton(
-                          label: '${m}min',
-                          selected: draft.durationMin == m,
-                          onTap: () => state.applyDuration(m),
-                        ),
+                  Expanded(
+                    child: Pressable(
+                      child: _PresetButton(
+                        key: TestKeys.rentalModeFixed,
+                        label: 'Tempo fixo',
+                        selected: !draft.openEnded,
+                        onTap: () => state.setDraftOpenEnded(false),
                       ),
                     ),
-                  ],
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Pressable(
+                      child: _PresetButton(
+                        key: TestKeys.rentalModeOpenEnded,
+                        label: 'Tempo corrido',
+                        selected: draft.openEnded,
+                        onTap: () => state.setDraftOpenEnded(true),
+                      ),
+                    ),
+                  ),
                 ],
               ),
-              const SizedBox(height: 8),
-              _TextInput(
-                key: ValueKey('duration-${draft.durationMin}'),
-                initial: '${draft.durationMin}',
-                keyboardType: TextInputType.number,
-                onChanged: (v) {
-                  final n = int.tryParse(v);
-                  if (n != null && n > 0) state.applyDuration(n);
-                },
-              ),
               const SizedBox(height: 12),
-              const _FieldLabel('Valor (R\$)'),
-              _TextInput(
-                key: ValueKey('price-${draft.price}'),
-                initial: draft.price.toStringAsFixed(0),
-                keyboardType: TextInputType.number,
-                onChanged: (v) {
-                  final n = double.tryParse(v);
-                  if (n != null) state.setDraftPrice(n);
-                },
-              ),
+              if (draft.openEnded) ...[
+                const _FieldLabel('Cobrado por minuto, no valor de:'),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                  child: Text(
+                    '${state.fmtMoney(state.ratePerMinute(state.toyById(draft.toyId)))}/min · calculado ao finalizar',
+                    style: const TextStyle(fontSize: 13, color: AppColors.text),
+                  ),
+                ),
+              ] else ...[
+                const _FieldLabel('Tempo (minutos)'),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    for (final m in presets) ...[
+                      if (m != presets.first) const SizedBox(width: 8),
+                      Expanded(
+                        child: Pressable(
+                          child: _PresetButton(
+                            label: '${m}min',
+                            selected: draft.durationMin == m,
+                            onTap: () => state.applyDuration(m),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 8),
+                _TextInput(
+                  key: ValueKey('duration-${draft.durationMin}'),
+                  initial: '${draft.durationMin}',
+                  keyboardType: TextInputType.number,
+                  onChanged: (v) {
+                    final n = int.tryParse(v);
+                    if (n != null && n > 0) state.applyDuration(n);
+                  },
+                ),
+                const SizedBox(height: 12),
+                const _FieldLabel('Valor (R\$)'),
+                _TextInput(
+                  key: ValueKey('price-${draft.price}'),
+                  initial: draft.price.toStringAsFixed(0),
+                  keyboardType: TextInputType.number,
+                  onChanged: (v) {
+                    final n = double.tryParse(v);
+                    if (n != null) state.setDraftPrice(n);
+                  },
+                ),
+              ],
               const SizedBox(height: 16),
               Row(
                 children: [
@@ -291,7 +334,7 @@ class _DropdownState extends State<_Dropdown> {
 }
 
 class _PresetButton extends StatelessWidget {
-  const _PresetButton({required this.label, required this.selected, required this.onTap});
+  const _PresetButton({super.key, required this.label, required this.selected, required this.onTap});
   final String label;
   final bool selected;
   final VoidCallback onTap;

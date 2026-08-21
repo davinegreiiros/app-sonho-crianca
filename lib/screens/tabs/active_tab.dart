@@ -69,6 +69,15 @@ class _ActiveTabState extends State<ActiveTab> with TickerProviderStateMixin {
   }
 }
 
+/// Plain MM:SS of elapsed time, counting up — no `+`/overtime sign, since
+/// a "tempo corrido" rental (spec 006) has no target it can run over.
+String _fmtElapsed(double elapsedMin) {
+  final mm = elapsedMin.floor();
+  final ss = ((elapsedMin - mm) * 60).round();
+  String pad(int n) => n.toString().padLeft(2, '0');
+  return '${pad(mm)}:${pad(ss)}';
+}
+
 class _ActiveCard extends StatelessWidget {
   const _ActiveCard({required this.state, required this.rental});
   final AppState state;
@@ -78,11 +87,17 @@ class _ActiveCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final toy = state.toyById(rental.toyId);
     final elapsedMin = DateTime.now().difference(rental.startedAt).inMilliseconds / 60000;
-    final remainMin = rental.durationMin - elapsedMin;
-    final ratio = remainMin / rental.durationMin;
-    final overtime = remainMin < 0;
-    final color = state.statusColor(ratio, overtime);
-    final progress = (elapsedMin / rental.durationMin).clamp(0.0, 1.0);
+
+    // "Tempo corrido" (spec 006) has no fixed duration, so none of the
+    // countdown/overtime/progress math below applies to it — no remaining
+    // time, no ratio, no urgency color, no percent-complete bar.
+    final openEnded = rental.isOpenEnded;
+    final duration = rental.durationMin;
+    final remainMin = openEnded ? 0.0 : duration! - elapsedMin;
+    final overtime = !openEnded && remainMin < 0;
+    final color = openEnded ? AppColors.accent : state.statusColor(remainMin / duration!, overtime);
+    final progress = openEnded ? 0.0 : (elapsedMin / duration!).clamp(0.0, 1.0);
+    final liveValue = openEnded ? state.computeFinalPrice(rental) : rental.price;
 
     return Container(
       key: TestKeys.activeCardKey(rental.id),
@@ -113,7 +128,7 @@ class _ActiveCard extends StatelessWidget {
                         borderRadius: BorderRadius.circular(2),
                       ),
                       child: Text(
-                        '${rental.durationMin} min',
+                        openEnded ? 'tempo corrido' : '$duration min',
                         style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: toy.ink.fg),
                       ),
                     ),
@@ -124,7 +139,7 @@ class _ActiveCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    state.fmtClock(remainMin),
+                    openEnded ? _fmtElapsed(elapsedMin) : state.fmtClock(remainMin),
                     style: TextStyle(
                       fontFamily: 'monospace',
                       fontSize: 17,
@@ -133,7 +148,7 @@ class _ActiveCard extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    state.fmtMoney(rental.price),
+                    openEnded ? '~${state.fmtMoney(liveValue)}' : state.fmtMoney(liveValue),
                     style: TextStyle(fontSize: 11, color: AppColors.text.withValues(alpha: 0.65)),
                   ),
                 ],
@@ -141,8 +156,10 @@ class _ActiveCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          StripedProgress(progress: progress, color: color, pulse: overtime && state.pulseOnOvertime),
-          const SizedBox(height: 8),
+          if (!openEnded) ...[
+            StripedProgress(progress: progress, color: color, pulse: overtime && state.pulseOnOvertime),
+            const SizedBox(height: 8),
+          ],
           Row(
             children: [
               Expanded(

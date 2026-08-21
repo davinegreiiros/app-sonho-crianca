@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../models/toy.dart';
 import '../state/app_state.dart';
+import '../test_keys.dart';
 import '../theme/app_colors.dart';
 import 'animations/pressable.dart';
 
@@ -23,6 +24,7 @@ class _AddToySheetState extends State<AddToySheet> {
   final _minutesCtrl = TextEditingController(text: '15');
   ToyInk _ink = ToyInk.cyan;
   String _imageKey = kToyIconOptions.first.key;
+  ToyCategory? _category;
 
   @override
   void dispose() {
@@ -37,7 +39,8 @@ class _AddToySheetState extends State<AddToySheet> {
       _nameCtrl.text.trim().isNotEmpty &&
       (int.tryParse(_qtyCtrl.text) ?? 0) > 0 &&
       (int.tryParse(_minutesCtrl.text) ?? 0) > 0 &&
-      (double.tryParse(_priceCtrl.text) ?? -1) >= 0;
+      (double.tryParse(_priceCtrl.text) ?? -1) >= 0 &&
+      _category != null;
 
   void _submit(AppState state) {
     if (!_valid) return;
@@ -47,6 +50,7 @@ class _AddToySheetState extends State<AddToySheet> {
       blockMin: int.parse(_minutesCtrl.text),
       ink: _ink,
       imageKey: _imageKey,
+      category: _category!,
       qty: int.parse(_qtyCtrl.text),
     );
     Navigator.of(context).pop();
@@ -93,6 +97,13 @@ class _AddToySheetState extends State<AddToySheet> {
               _IconGrid(
                 selected: _imageKey,
                 onSelected: (key) => setState(() => _imageKey = key),
+              ),
+              const SizedBox(height: 18),
+              const _FieldLabel('Tipo'),
+              const SizedBox(height: 6),
+              _CategoryPicker(
+                selected: _category,
+                onSelected: (c) => setState(() => _category = c),
               ),
               const SizedBox(height: 18),
               Row(
@@ -188,6 +199,7 @@ class _AddToySheetState extends State<AddToySheet> {
                     flex: 2,
                     child: Pressable(
                       child: ElevatedButton(
+                        key: TestKeys.addToySubmitButton,
                         onPressed: _valid ? () => _submit(state) : null,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.accent,
@@ -384,6 +396,49 @@ class _IconGridState extends State<_IconGrid> {
           },
         ),
       ),
+    );
+  }
+}
+
+class _CategoryPicker extends StatelessWidget {
+  const _CategoryPicker({required this.selected, required this.onSelected});
+  final ToyCategory? selected;
+  final ValueChanged<ToyCategory> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        for (final c in ToyCategory.values)
+          Pressable(
+            key: TestKeys.categoryOption(c.name),
+            child: GestureDetector(
+              onTap: () => onSelected(c),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 140),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: selected == c ? AppColors.accent : AppColors.surface,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: selected == c ? AppColors.accent : AppColors.text.withValues(alpha: 0.14),
+                    width: selected == c ? 1.6 : 1,
+                  ),
+                ),
+                child: Text(
+                  c.label,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: selected == c ? AppColors.bg : AppColors.text,
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

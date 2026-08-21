@@ -1,8 +1,13 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import '../models/business_settings.dart';
 import '../models/rental.dart';
 import '../models/toy.dart';
+import '../notifications/local_rental_notifier.dart';
+import '../notifications/notification_texts.dart';
+import '../notifications/rental_notifier.dart';
 import '../theme/app_colors.dart';
 
 enum AppTab { home, active, catalog, report }
@@ -26,6 +31,12 @@ class RentalDraft {
   String guardianPhone;
   int durationMin;
   double price;
+
+  /// "Tempo corrido" (spec 006): no fixed duration, price computed from
+  /// elapsed time when the rental is finished. When `true`, [durationMin]/
+  /// [price] above are still kept in sync with the current toy (so no
+  /// non-nullable field goes stale) but the UI doesn't show or use them.
+  bool openEnded = false;
 }
 
 /// Central app state, ported from the original `.dc.html` Component logic:
@@ -33,9 +44,57 @@ class RentalDraft {
 /// end-rental flow, and the report period filter. A 1s ticker keeps active
 /// rental countdowns live.
 class AppState extends ChangeNotifier {
-  AppState() {
+  AppState({RentalNotifier? notifications}) : notifications = notifications ?? LocalRentalNotifier() {
     _seed();
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) => notifyListeners());
+    _loadBusinessSettings();
+  }
+
+  /// Schedules/cancels "this rental's time is up" notifications (spec
+  /// 005-notificacoes-locais). Injectable so tests can swap in a fake
+  /// instead of hitting a real platform channel — see `RentalNotifier`.
+  final RentalNotifier notifications;
+
+  static const _prefsMerchantName = 'business_merchant_name';
+  static const _prefsMerchantCity = 'business_merchant_city';
+  static const _prefsPixKey = 'business_pix_key';
+
+  BusinessSettings businessSettings = const BusinessSettings();
+
+  /// Set by [dispose]. [_loadBusinessSettings]'s `await` can resolve after
+  /// this `AppState` is already gone (e.g. a test builds one, asserts, and
+  /// disposes it before `SharedPreferences.getInstance()` gets back) —
+  /// `notifyListeners()` on a disposed `ChangeNotifier` throws, so every
+  /// callback that survives an `await` checks this first.
+  bool _disposed = false;
+
+  /// Loads the persisted Pix/business config, if any, from local device
+  /// storage (spec 004-pix-qrcode) — never from the network, never
+  /// bundled with the app. Starts with empty defaults and notifies once
+  /// this resolves, same pattern as any other async-at-boot state.
+  Future<void> _loadBusinessSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (_disposed) return;
+    businessSettings = BusinessSettings(
+      merchantName: prefs.getString(_prefsMerchantName) ?? '',
+      merchantCity: prefs.getString(_prefsMerchantCity) ?? '',
+      pixKey: prefs.getString(_prefsPixKey) ?? '',
+    );
+    notifyListeners();
+  }
+
+  Future<void> updateBusinessSettings({
+    required String merchantName,
+    required String merchantCity,
+    required String pixKey,
+  }) async {
+    businessSettings = BusinessSettings(merchantName: merchantName, merchantCity: merchantCity, pixKey: pixKey);
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    if (_disposed) return;
+    await prefs.setString(_prefsMerchantName, merchantName);
+    await prefs.setString(_prefsMerchantCity, merchantCity);
+    await prefs.setString(_prefsPixKey, pixKey);
   }
 
   // ---- config (design-time props in the original, fixed defaults here) ----
@@ -54,6 +113,12 @@ class AppState extends ChangeNotifier {
 
   String? endingId;
   PaymentMethod? endPayment;
+
+  /// Whether the "Finalizar locação" dialog is showing the Pix QR step
+  /// (spec 004-pix-qrcode) instead of the payment-method picker — same
+  /// dialog route, different content, so it never races with
+  /// [closeEnd]'s reset of [endingId]/[endPayment].
+  bool endShowPixQr = false;
 
   ReportPeriod reportPeriod = ReportPeriod.today;
 
@@ -90,6 +155,7 @@ class AppState extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     _ticker.cancel();
     super.dispose();
   }
@@ -183,25 +249,65 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setDraftOpenEnded(bool v) {
+    draft.openEnded = v;
+    notifyListeners();
+  }
+
+  /// Price per minute a toy earns, derived from its own block — the only
+  /// rate a "tempo corrido" (open-ended) rental uses.
+  double ratePerMinute(Toy t) => t.price / t.blockMin;
+
+  /// The price a rental should charge right now: the fixed [Rental.price]
+  /// for a normal rental, or the live/final tempo-corrido estimate
+  /// (elapsed minutes × [ratePerMinute], rounded to the cent) for an
+  /// open-ended one. Used both by the active-rental card (live estimate)
+  /// and by [confirmEnd] (the actual amount charged) so the two can never
+  /// diverge — same formula, same call.
+  double computeFinalPrice(Rental r) {
+    if (!r.isOpenEnded) return r.price;
+    final toy = toyById(r.toyId);
+    final elapsedMin = DateTime.now().difference(r.startedAt).inMilliseconds / 60000;
+    final raw = ratePerMinute(toy) * elapsedMin;
+    return (raw * 100).round() / 100;
+  }
+
   void submitNew() {
     final d = draft;
     if (d.childName.trim().isEmpty) return;
-    rentals.add(Rental(
+    final rental = Rental(
       id: 'r${DateTime.now().microsecondsSinceEpoch}',
       toyId: d.toyId,
       childName: d.childName.trim(),
       guardianName: d.guardianName.trim().isEmpty ? '—' : d.guardianName.trim(),
       guardianPhone: d.guardianPhone.trim(),
       startedAt: DateTime.now(),
-      durationMin: d.durationMin,
-      price: d.price,
+      durationMin: d.openEnded ? null : d.durationMin,
+      price: d.openEnded ? 0 : d.price,
       status: RentalStatus.active,
-    ));
+    );
+    rentals.add(rental);
+    _scheduleEndNotification(rental);
     showNew = false;
     notifyListeners();
   }
 
+  /// Tempo corrido (spec 006) has no target end time to notify about —
+  /// only a fixed-duration rental gets a "time's up" notification.
+  void _scheduleEndNotification(Rental rental) {
+    if (rental.isOpenEnded) return;
+    final toy = toyById(rental.toyId);
+    final (title, body) = rentalEndedNotificationText(childName: rental.childName, toyName: toy.name);
+    notifications.scheduleRentalEnd(
+      rentalId: rental.id,
+      title: title,
+      body: body,
+      at: rental.startedAt.add(Duration(minutes: rental.durationMin!)),
+    );
+  }
+
   void cancelActive(String id) {
+    notifications.cancelRentalEnd(id);
     rentals.removeWhere((r) => r.id == id);
     notifyListeners();
   }
@@ -209,12 +315,14 @@ class AppState extends ChangeNotifier {
   void openEnd(String id) {
     endingId = id;
     endPayment = null;
+    endShowPixQr = false;
     notifyListeners();
   }
 
   void closeEnd() {
     endingId = null;
     endPayment = null;
+    endShowPixQr = false;
     notifyListeners();
   }
 
@@ -223,9 +331,19 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Switches the still-open "Finalizar locação" dialog to the Pix QR
+  /// step. Doesn't touch [endingId]/[endPayment] — [confirmEnd] still
+  /// needs them when the operator finishes that step.
+  void showPixQrStep() {
+    endShowPixQr = true;
+    notifyListeners();
+  }
+
   void confirmEnd() {
     if (endPayment == null || endingId == null) return;
     final r = rentals.firstWhere((r) => r.id == endingId);
+    notifications.cancelRentalEnd(r.id);
+    if (r.isOpenEnded) r.price = computeFinalPrice(r);
     r.finish(endPayment!);
     endingId = null;
     endPayment = null;
@@ -253,10 +371,14 @@ class AppState extends ChangeNotifier {
     required int blockMin,
     required ToyInk ink,
     required String imageKey,
+    required ToyCategory category,
     int qty = 1,
   }) {
     final id = 'custom_${DateTime.now().microsecondsSinceEpoch}';
-    toys = [...toys, Toy(id: id, name: name, qty: qty, blockMin: blockMin, price: price, ink: ink, imageKey: imageKey)];
+    toys = [
+      ...toys,
+      Toy(id: id, name: name, qty: qty, blockMin: blockMin, price: price, ink: ink, imageKey: imageKey, category: category),
+    ];
     notifyListeners();
   }
 
