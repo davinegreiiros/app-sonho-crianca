@@ -120,6 +120,15 @@ class AppState extends ChangeNotifier {
   /// [closeEnd]'s reset of [endingId]/[endPayment].
   bool endShowPixQr = false;
 
+  /// Price frozen the instant the Pix QR step opens ([showPixQrStep]) —
+  /// for a tempo-corrido (spec 006) rental, [computeFinalPrice] keeps
+  /// climbing every second the QR stays on screen, so recomputing it
+  /// again in [confirmEnd] once the customer finally pays would charge
+  /// more than the amount actually encoded in the QR they scanned. `null`
+  /// outside the Pix QR step (Cartão/Dinheiro confirm at the price shown
+  /// there and then, no QR-wait window to freeze against).
+  double? endFrozenPrice;
+
   ReportPeriod reportPeriod = ReportPeriod.today;
 
   void _seed() {
@@ -316,6 +325,7 @@ class AppState extends ChangeNotifier {
     endingId = id;
     endPayment = null;
     endShowPixQr = false;
+    endFrozenPrice = null;
     notifyListeners();
   }
 
@@ -323,6 +333,7 @@ class AppState extends ChangeNotifier {
     endingId = null;
     endPayment = null;
     endShowPixQr = false;
+    endFrozenPrice = null;
     notifyListeners();
   }
 
@@ -333,8 +344,12 @@ class AppState extends ChangeNotifier {
 
   /// Switches the still-open "Finalizar locação" dialog to the Pix QR
   /// step. Doesn't touch [endingId]/[endPayment] — [confirmEnd] still
-  /// needs them when the operator finishes that step.
+  /// needs them when the operator finishes that step. Freezes
+  /// [endFrozenPrice] right now, at the same value the QR is about to be
+  /// generated from — see the field's doc for why that freeze matters.
   void showPixQrStep() {
+    final r = rentals.firstWhere((r) => r.id == endingId);
+    endFrozenPrice = computeFinalPrice(r);
     endShowPixQr = true;
     notifyListeners();
   }
@@ -343,10 +358,15 @@ class AppState extends ChangeNotifier {
     if (endPayment == null || endingId == null) return;
     final r = rentals.firstWhere((r) => r.id == endingId);
     notifications.cancelRentalEnd(r.id);
-    if (r.isOpenEnded) r.price = computeFinalPrice(r);
+    // Reuse the price frozen when the Pix QR was generated, if there was
+    // one — never recompute a tempo-corrido price after the QR was
+    // already shown, or the amount charged could exceed what the
+    // customer's bank app actually scanned.
+    if (r.isOpenEnded) r.price = endFrozenPrice ?? computeFinalPrice(r);
     r.finish(endPayment!);
     endingId = null;
     endPayment = null;
+    endFrozenPrice = null;
     notifyListeners();
   }
 

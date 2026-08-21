@@ -23,7 +23,11 @@ class PixQrSheet extends StatelessWidget {
     final rental = state.rentals.where((r) => r.id == rentalId).firstOrNull;
     if (rental == null) return const SizedBox.shrink();
 
-    final amount = state.computeFinalPrice(rental);
+    // `showPixQrStep()` already froze this the instant the QR step opened
+    // (spec 004/006 fix: a tempo-corrido price keeps climbing every
+    // second the QR is on screen) — reuse that exact value here so the
+    // QR always encodes the same amount `confirmEnd()` ends up charging.
+    final amount = state.endFrozenPrice ?? state.computeFinalPrice(rental);
     final settings = state.businessSettings;
     final payload = buildPixPayload(
       merchantName: settings.merchantName,

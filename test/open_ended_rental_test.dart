@@ -117,6 +117,53 @@ void main() {
       expect(finished.price, 5.0); // 10min * 0.50/min
     });
 
+    testWidgets('Pix QR freezes the price — a slow-to-pay customer is not charged more', (tester) async {
+      await tester.pumpWidget(const SonhoDeCriancaApp());
+      await tester.pump(const Duration(milliseconds: 400));
+      final state = Provider.of<AppState>(tester.element(find.byType(MaterialApp)), listen: false);
+
+      state.openNew();
+      state.setDraftToy('cama'); // 0.50/min
+      state.setDraftChild('Aberta Pix');
+      state.setDraftOpenEnded(true);
+      state.submitNew();
+      final rental = state.rentals.firstWhere((r) => r.childName == 'Aberta Pix');
+
+      // 10 min elapsed at the moment the operator opens the Pix QR.
+      void backdateStart(Duration elapsed) {
+        final index = state.rentals.indexWhere((r) => r.id == rental.id);
+        state.rentals[index] = Rental(
+          id: rental.id,
+          toyId: rental.toyId,
+          childName: rental.childName,
+          guardianName: rental.guardianName,
+          startedAt: DateTime.now().subtract(elapsed),
+          durationMin: null,
+          price: 0,
+          status: RentalStatus.active,
+        );
+      }
+
+      backdateStart(const Duration(minutes: 10));
+      state.openEnd(rental.id);
+      state.selectPayment(PaymentMethod.pix);
+      state.showPixQrStep(); // freezes the price at the 10min mark: R$5,00
+      expect(state.endFrozenPrice, 5.0);
+
+      // The customer takes a while to actually scan/pay — the clock the
+      // active-rental card would show keeps climbing underneath the QR.
+      backdateStart(const Duration(minutes: 16));
+      expect(state.computeFinalPrice(state.rentals.firstWhere((r) => r.id == rental.id)), 8.0);
+
+      state.confirmEnd();
+
+      final finished = state.rentals.firstWhere((r) => r.id == rental.id);
+      // Charged the amount actually encoded in the QR the customer
+      // scanned (R$5,00) — not the inflated R$8,00 the delay would have
+      // produced if `confirmEnd` had recomputed it fresh.
+      expect(finished.price, 5.0);
+    });
+
     testWidgets('cancelling an open-ended rental charges nothing', (tester) async {
       await tester.pumpWidget(const SonhoDeCriancaApp());
       await tester.pump(const Duration(milliseconds: 400));
