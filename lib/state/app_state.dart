@@ -375,6 +375,17 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// "Trocar forma" on the Pix QR step (spec 007-revisao-design-v3):
+  /// backs out to payment-method selection without closing the "Finalizar
+  /// locação" dialog — [endingId]/[endPayment] stay put, only the QR step
+  /// and its frozen price reset (re-entering Pix re-freezes at whatever
+  /// the price is by then).
+  void hidePixQrStep() {
+    endShowPixQr = false;
+    endFrozenPrice = null;
+    notifyListeners();
+  }
+
   void confirmEnd() {
     if (endPayment == null || endingId == null) return;
     final r = rentals.firstWhere((r) => r.id == endingId);

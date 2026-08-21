@@ -7,6 +7,7 @@ import '../state/app_state.dart';
 import '../test_keys.dart';
 import '../theme/app_colors.dart';
 import 'animations/pressable.dart';
+import 'category_icon.dart';
 
 /// "Novo brinquedo" bottom sheet: name, a scrollable grid of illustrated
 /// icon options, quantity/price/duration and an ink color pick.
@@ -420,20 +421,27 @@ class _CategoryPicker extends StatelessWidget {
                 duration: const Duration(milliseconds: 140),
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
-                  color: selected == c ? AppColors.accent : AppColors.surface,
-                  borderRadius: BorderRadius.circular(20),
+                  color: selected == c ? c.iconTint : AppColors.surface,
+                  borderRadius: BorderRadius.circular(3),
                   border: Border.all(
-                    color: selected == c ? AppColors.accent : AppColors.text.withValues(alpha: 0.14),
+                    color: selected == c ? c.iconFg : AppColors.text.withValues(alpha: 0.14),
                     width: selected == c ? 1.6 : 1,
                   ),
                 ),
-                child: Text(
-                  c.label,
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w600,
-                    color: selected == c ? AppColors.bg : AppColors.text,
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CategoryIcon(category: c, color: selected == c ? c.iconFg : AppColors.text.withValues(alpha: 0.6), size: 15),
+                    const SizedBox(width: 7),
+                    Text(
+                      c.label,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: selected == c ? c.iconFg : AppColors.text,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),

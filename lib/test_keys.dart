@@ -41,4 +41,7 @@ class TestKeys {
   static const pixQrImage = ValueKey('pix_qr_image');
   static const copyPixPayloadButton = ValueKey('copy_pix_payload_button');
   static const pixQrDoneButton = ValueKey('pix_qr_done_button');
+  static const pixTrocarFormaButton = ValueKey('pix_trocar_forma_button');
+
+  static const settingsScreenBackButton = ValueKey('settings_screen_back_button');
 }

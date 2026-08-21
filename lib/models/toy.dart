@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart' show Color;
+
 import '../theme/app_colors.dart';
 
 /// Fixed set of toy categories — every toy (seed or user-added) declares
@@ -13,6 +15,33 @@ extension ToyCategoryLabel on ToyCategory {
         ToyCategory.aquatico => 'Aquático',
         ToyCategory.radiocontrole => 'Rádio-controle',
         ToyCategory.outro => 'Outro',
+      };
+}
+
+/// Phosphor-duotone icon + fixed "tinta" per category (design source:
+/// `specs/007-revisao-design-v3/`, artboard 1b) — one ink per category,
+/// not to be confused with [ToyInk], which is a CMY color picked per
+/// individual toy. Mapping: amarelo = energia, magenta = infla/rádio,
+/// ciano = roda/água, neutro = Outro.
+extension ToyCategoryIcon on ToyCategory {
+  String get iconAsset => 'assets/icons/category/$name.svg';
+
+  Color get iconFg => switch (this) {
+        ToyCategory.eletrico => AppColors.yellowFg,
+        ToyCategory.inflavel => AppColors.accent2_700,
+        ToyCategory.radiocontrole => AppColors.accent2_700,
+        ToyCategory.passeio => AppColors.accent700,
+        ToyCategory.aquatico => AppColors.accent700,
+        ToyCategory.outro => AppColors.neutralFg,
+      };
+
+  Color get iconTint => switch (this) {
+        ToyCategory.eletrico => AppColors.yellowTint,
+        ToyCategory.inflavel => AppColors.accent2_200,
+        ToyCategory.radiocontrole => AppColors.accent2_200,
+        ToyCategory.passeio => AppColors.accent200,
+        ToyCategory.aquatico => AppColors.accent200,
+        ToyCategory.outro => AppColors.surface,
       };
 }
 

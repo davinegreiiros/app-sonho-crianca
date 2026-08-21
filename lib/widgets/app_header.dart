@@ -67,7 +67,7 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
               InkWell(
                 key: TestKeys.settingsGearButton,
                 borderRadius: BorderRadius.circular(20),
-                onTap: () => showBusinessSettingsSheet(context),
+                onTap: () => openBusinessSettingsScreen(context),
                 child: Padding(
                   padding: const EdgeInsets.all(4),
                   child: Icon(Icons.settings_outlined, size: 18, color: AppColors.text.withValues(alpha: 0.6)),

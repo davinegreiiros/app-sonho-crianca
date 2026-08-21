@@ -30,5 +30,6 @@ Sem `spec.md` aprovado, sem código de feature. Bugfix simples e chore não prec
 | [004](004-pix-qrcode/spec.md) | QR Code Pix na finalização de locação | Implemented | 002 |
 | [005](005-notificacoes-locais/spec.md) | Notificações locais de fim de locação | Código completo, falta validar em device | 002 |
 | [006](006-locacao-tempo-corrido/spec.md) | Locação em tempo corrido | Implemented | — |
+| [007](007-revisao-design-v3/spec.md) | Revisão de Design v3 — ícones categoria, canhoto, Pix, Configurações, tempo corrido | Implemented | 001, 003, 004, 006 |
 
 Todas em `Draft` — cada uma tem "Dúvidas em aberto" que precisa de resposta sua antes de virar `Approved` e ganhar `plan.md`/`tasks.md`.

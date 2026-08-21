@@ -8,6 +8,7 @@ import '../../test_keys.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/animations/cascade.dart';
 import '../../widgets/animations/pressable.dart';
+import '../../widgets/category_icon.dart';
 import '../../widgets/modal_launchers.dart';
 import '../../widgets/toy_icon.dart';
 
@@ -165,7 +166,12 @@ class _ToyCard extends StatelessWidget {
                   style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, height: 1.2),
                 ),
                 const SizedBox(height: 5),
-                _Tag(text: toy.category.label, color: toy.ink.fg),
+                _Tag(
+                  text: toy.category.label,
+                  color: toy.category.iconFg,
+                  background: toy.category.iconTint,
+                  icon: CategoryIcon(category: toy.category, color: toy.category.iconFg, size: 13),
+                ),
                 const SizedBox(height: 6),
                 _AvailabilityTickets(toy: toy, avail: avail),
                 const SizedBox(height: 8),
@@ -206,21 +212,29 @@ class _ToyCard extends StatelessWidget {
 }
 
 class _Tag extends StatelessWidget {
-  const _Tag({required this.text, required this.color});
+  const _Tag({required this.text, required this.color, this.background, this.icon});
   final String text;
   final Color color;
+  final Color? background;
+  final Widget? icon;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
-        color: AppColors.bg.withValues(alpha: 0.7),
+        color: background ?? AppColors.bg.withValues(alpha: 0.7),
         borderRadius: BorderRadius.circular(2),
       ),
-      child: Text(
-        text,
-        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: color),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[icon!, const SizedBox(width: 5)],
+          Text(
+            text,
+            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: color),
+          ),
+        ],
       ),
     );
   }
@@ -282,9 +296,20 @@ class _TicketStub extends StatelessWidget {
             decoration: BoxDecoration(
               color: free ? ink.dot : Colors.transparent,
               borderRadius: BorderRadius.circular(2),
-              border: Border.all(color: free ? ink.dot : AppColors.text.withValues(alpha: 0.3), width: 1),
+              // "Em uso" vira canhoto destacado: só contorno, sem
+              // preenchimento (design source, artboard 1a).
+              border: Border.all(color: free ? ink.dot : AppColors.text.withValues(alpha: 0.45), width: 1),
             ),
           ),
+          // Retícula (halftone) de pontos por dentro do canhoto livre —
+          // textura da faixa CMY (design source, artboard 1a).
+          if (free)
+            Positioned.fill(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(2),
+                child: CustomPaint(painter: _HalftonePainter(dotColor: ink.tint)),
+              ),
+            ),
           // Perforation notches, colored like the card body so they read
           // as punched-out half-circles on the ticket's long edges.
           Positioned(
@@ -307,6 +332,29 @@ class _TicketStub extends StatelessWidget {
         height: _notch,
         decoration: BoxDecoration(color: ink.tint, shape: BoxShape.circle),
       );
+}
+
+/// Small dot grid painted over a filled/free ticket stub, matching the
+/// halftone retícula texture in the design source (artboard 1a).
+class _HalftonePainter extends CustomPainter {
+  _HalftonePainter({required this.dotColor});
+  final Color dotColor;
+
+  static const _step = 3.5;
+  static const _radius = 0.55;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = dotColor.withValues(alpha: 0.5);
+    for (double y = _step; y < size.height; y += _step) {
+      for (double x = _step; x < size.width; x += _step) {
+        canvas.drawCircle(Offset(x, y), _radius, paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _HalftonePainter oldDelegate) => oldDelegate.dotColor != dotColor;
 }
 
 void _confirmRemove(BuildContext context, AppState state, Toy toy) {

@@ -152,7 +152,7 @@ class EndRentalDialog extends StatelessWidget {
                                       if (!state.businessSettings.isConfigured) {
                                         state.closeEnd();
                                         Navigator.of(context).pop();
-                                        showBusinessSettingsSheet(
+                                        openBusinessSettingsScreen(
                                           context,
                                           hint: 'Configure isso antes de cobrar por Pix.',
                                         );

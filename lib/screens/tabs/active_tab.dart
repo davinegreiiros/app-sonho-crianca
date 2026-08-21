@@ -6,7 +6,9 @@ import '../../state/app_state.dart';
 import '../../test_keys.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/animations/cascade.dart';
+import '../../widgets/animations/endless_rail.dart';
 import '../../widgets/animations/pressable.dart';
+import '../../widgets/animations/pulse.dart';
 import '../../widgets/animations/striped_progress.dart';
 import '../../widgets/modal_launchers.dart';
 import '../../widgets/toy_icon.dart';
@@ -69,6 +71,101 @@ class _ActiveTabState extends State<ActiveTab> with TickerProviderStateMixin {
   }
 }
 
+/// "Estimado agora" block for a tempo-corrido card: the running total in
+/// large type plus elapsed minutes and a reminder that the final charge
+/// only locks in when the operator taps "Parar e cobrar" (design source:
+/// `specs/007-revisao-design-v3`, artboard 1e).
+class _EstimateNow extends StatelessWidget {
+  const _EstimateNow({required this.value, required this.elapsedMin, required this.fmtMoney});
+  final double value;
+  final double elapsedMin;
+  final String Function(double) fmtMoney;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
+      decoration: BoxDecoration(color: AppColors.bg.withValues(alpha: 0.62), borderRadius: BorderRadius.circular(3)),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'ESTIMADO AGORA',
+                  style: TextStyle(
+                    fontSize: 9.5,
+                    letterSpacing: 1,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.text.withValues(alpha: 0.55),
+                  ),
+                ),
+                Text(fmtMoney(value), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600, height: 1.1)),
+              ],
+            ),
+          ),
+          Text(
+            '${elapsedMin.floor()} min\nfecha no botão',
+            textAlign: TextAlign.right,
+            style: TextStyle(fontSize: 11, height: 1.4, color: AppColors.text.withValues(alpha: 0.6)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// "Tempo corrido" badge styled like a punched ticket stub — two small
+/// notches on its left/right edges, colored like the card behind it, so
+/// it reads as a canhoto picotado rather than a plain pill (design
+/// source: `specs/007-revisao-design-v3`, artboard 1e bullet list).
+class _CanhotoBadge extends StatelessWidget {
+  const _CanhotoBadge({required this.cardColor, required this.fg});
+  final Color cardColor;
+  final Color fg;
+
+  static const _notch = 7.0;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+          decoration: BoxDecoration(color: AppColors.bg.withValues(alpha: 0.78), borderRadius: BorderRadius.circular(1.5)),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.all_inclusive_rounded, size: 12, color: fg),
+              const SizedBox(width: 5),
+              Text(
+                'TEMPO CORRIDO',
+                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, letterSpacing: 0.6, color: fg),
+              ),
+            ],
+          ),
+        ),
+        Positioned(
+          left: -_notch / 2,
+          top: 0,
+          bottom: 0,
+          child: Center(child: _notchDot()),
+        ),
+        Positioned(
+          right: -_notch / 2,
+          top: 0,
+          bottom: 0,
+          child: Center(child: _notchDot()),
+        ),
+      ],
+    );
+  }
+
+  Widget _notchDot() => Container(width: _notch, height: _notch, decoration: BoxDecoration(color: cardColor, shape: BoxShape.circle));
+}
+
 /// Plain MM:SS of elapsed time, counting up — no `+`/overtime sign, since
 /// a "tempo corrido" rental (spec 006) has no target it can run over.
 String _fmtElapsed(double elapsedMin) {
@@ -95,9 +192,13 @@ class _ActiveCard extends StatelessWidget {
     final duration = rental.durationMin;
     final remainMin = openEnded ? 0.0 : duration! - elapsedMin;
     final overtime = !openEnded && remainMin < 0;
-    final color = openEnded ? AppColors.accent : state.statusColor(remainMin / duration!, overtime);
+    // Tempo corrido (spec 006) reads in magenta, not the fixed rental's
+    // green/amber/red status colors — it never has an "urgency" state to
+    // signal (design source, artboard 1e).
+    final color = openEnded ? AppColors.accent2_700 : state.statusColor(remainMin / duration!, overtime);
     final progress = openEnded ? 0.0 : (elapsedMin / duration!).clamp(0.0, 1.0);
     final liveValue = openEnded ? state.computeFinalPrice(rental) : rental.price;
+    final rate = openEnded ? (rental.ratePerMinute ?? state.ratePerMinute(toy)) : 0.0;
 
     return Container(
       key: TestKeys.activeCardKey(rental.id),
@@ -121,34 +222,47 @@ class _ActiveCard extends StatelessWidget {
                       style: TextStyle(fontSize: 12, color: AppColors.text.withValues(alpha: 0.7)),
                     ),
                     const SizedBox(height: 5),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppColors.bg.withValues(alpha: 0.7),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                      child: Text(
-                        openEnded ? 'tempo corrido' : '$duration min',
-                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: toy.ink.fg),
-                      ),
-                    ),
+                    openEnded
+                        ? _CanhotoBadge(cardColor: toy.ink.tint, fg: toy.ink.fg)
+                        : Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppColors.bg.withValues(alpha: 0.7),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                            child: Text(
+                              '$duration min',
+                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: toy.ink.fg),
+                            ),
+                          ),
                   ],
                 ),
               ),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text(
-                    openEnded ? _fmtElapsed(elapsedMin) : state.fmtClock(remainMin),
-                    style: TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: 17,
-                      fontWeight: FontWeight.w600,
-                      color: color,
-                    ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (openEnded) ...[
+                        Pulse(
+                          child: Icon(Icons.keyboard_arrow_up_rounded, size: 14, color: color),
+                        ),
+                        const SizedBox(width: 2),
+                      ],
+                      Text(
+                        openEnded ? _fmtElapsed(elapsedMin) : state.fmtClock(remainMin),
+                        style: TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 17,
+                          fontWeight: FontWeight.w600,
+                          color: color,
+                        ),
+                      ),
+                    ],
                   ),
                   Text(
-                    openEnded ? '~${state.fmtMoney(liveValue)}' : state.fmtMoney(liveValue),
+                    openEnded ? '${state.fmtMoney(rate)}/min' : state.fmtMoney(liveValue),
                     style: TextStyle(fontSize: 11, color: AppColors.text.withValues(alpha: 0.65)),
                   ),
                 ],
@@ -156,7 +270,12 @@ class _ActiveCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          if (!openEnded) ...[
+          if (openEnded) ...[
+            _EstimateNow(value: liveValue, elapsedMin: elapsedMin, fmtMoney: state.fmtMoney),
+            const SizedBox(height: 10),
+            EndlessRail(color: color),
+            const SizedBox(height: 8),
+          ] else ...[
             StripedProgress(progress: progress, color: color, pulse: overtime && state.pulseOnOvertime),
             const SizedBox(height: 8),
           ],
@@ -194,7 +313,7 @@ class _ActiveCard extends StatelessWidget {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(3)),
                       textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                     ),
-                    child: const Text('Finalizar'),
+                    child: Text(openEnded ? 'Parar e cobrar' : 'Finalizar'),
                   ),
                 ),
               ),

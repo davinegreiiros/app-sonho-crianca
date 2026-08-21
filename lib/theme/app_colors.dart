@@ -53,6 +53,10 @@ class AppColors {
   static const magentaDot = accent2;
 
   static const yellowDot = processYellow;
+
+  // Neutral "Outro" category ink (specs/007-revisao-design-v3): fg over
+  // `surface`, no dedicated tint — reuses `surface` itself as background.
+  static const neutralFg = Color(0xFF605D5D);
 }
 
 /// One of the three CMY "inks" a toy is tagged with, driving its tint colors

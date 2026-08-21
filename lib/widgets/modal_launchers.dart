@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../screens/business_settings_screen.dart';
 import '../state/app_state.dart';
 import '../theme/app_colors.dart';
 import 'add_toy_sheet.dart';
-import 'business_settings_sheet.dart';
 import 'end_rental_dialog.dart';
 import 'new_rental_sheet.dart';
 
@@ -66,14 +66,11 @@ Future<void> showAddToySheet(BuildContext context) {
 }
 
 /// Opens "Configurações do negócio" (name/city/Pix key — spec
-/// 004-pix-qrcode) as a modal bottom sheet. [hint] is shown when this was
-/// triggered by picking "Pix" before anything was configured yet.
-Future<void> showBusinessSettingsSheet(BuildContext context, {String? hint}) {
-  return showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    barrierColor: AppColors.text.withValues(alpha: 0.5),
-    builder: (context) => BusinessSettingsSheet(hint: hint),
+/// 004-pix-qrcode) as a full-page destination (spec 007-revisao-design-v3,
+/// artboard 1d: it's navigation, not a flow form). [hint] is shown when
+/// this was triggered by picking "Pix" before anything was configured yet.
+Future<void> openBusinessSettingsScreen(BuildContext context, {String? hint}) {
+  return Navigator.of(context).push<void>(
+    MaterialPageRoute(builder: (context) => BusinessSettingsScreen(hint: hint)),
   );
 }
