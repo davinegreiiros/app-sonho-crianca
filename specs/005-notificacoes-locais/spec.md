@@ -1,6 +1,6 @@
 # Spec: Notificações locais de fim de locação
 
-Status: Approved (código completo — pendente validação manual em device, ver `tasks.md` T10)
+Status: Implemented (validado em device real em 2026-08-22, ver `tasks.md` T10)
 Criado: 2026-08-15
 Depende de: [specs/002-seguranca-dados/spec.md](../002-seguranca-dados/spec.md)
 
@@ -30,7 +30,7 @@ Quando o tempo de uma locação ativa termina, o app dispara uma notificação l
 
 ## Critérios de aceite
 
-- [ ] `flutter_local_notifications` integrado, com canal Android dedicado (nome/descrição em pt-BR) e permissão `POST_NOTIFICATIONS` pedida em runtime só na primeira vez que a feature é usada (ex: ao criar a primeira locação), não no boot do app.
+- [ ] `flutter_local_notifications` integrado, com canal Android dedicado (nome/descrição em pt-BR) e permissão `POST_NOTIFICATIONS`/`UNUserNotificationCenter` pedida em runtime assim que o app abre (ver amendment 2026-08-22 abaixo — decisão original era lazy, no primeiro uso; trocada pra boot).
 - [ ] Uma notificação é agendada no momento em que uma locação é criada (`submitNew`, `app_state.dart:186`), pro horário exato `startedAt + durationMin`.
 - [ ] Notificação é cancelada se a locação for cancelada (`cancelActive`) ou finalizada manualmente antes do tempo acabar (`confirmEnd`) — sem notificação órfã.
 - [ ] Texto da notificação identifica brinquedo + nome da criança (decisão registrada acima), sem expor telefone/nome do responsável — esse continua fora da notificação.
@@ -43,11 +43,17 @@ Quando o tempo de uma locação ativa termina, o app dispara uma notificação l
 ## Requisitos não-funcionais
 
 - Permissão `POST_NOTIFICATIONS` (Android 13+) e, se o agendamento exigir, `SCHEDULE_EXACT_ALARM`/`USE_EXACT_ALARM` — ambas revisadas contra `002-seguranca-dados` antes de entrar no manifest.
-- iOS: `UNUserNotificationCenter` — permissão pedida com o mesmo cuidado de timing (não no boot).
+- iOS: `UNUserNotificationCenter` — permissão pedida no boot (ver amendment abaixo).
 
 ## Decisões registradas (2026-08-16)
 
 - **Som/vibração:** padrão do sistema (canal Android sem som/vibração customizados) — menos código, menos superfície de bug, consistente com o resto do SO do operador.
 - **Resumo de vencidas:** não é feature desta spec — a aba "Em andamento" já mostra overtime em vermelho/pulsando (`statusColor`/`pulseOnOvertime`), isso já resolve. Se no uso real não bastar, é spec própria depois.
+
+## Amendment (2026-08-22, resposta do dono do produto)
+
+Decisão original era pedir a permissão de forma lazy, só no primeiro agendamento real (evitar pedir sem contexto no boot). Na prática o operador não notou a notificação nem percebeu que a permissão nunca tinha sido concedida. Trocado pra: **permissão pedida assim que o app abre**, dentro do construtor de `AppState` (`notifications.init()`, fire-and-forget — não bloqueia o boot, `init()` já é idempotente e engole os próprios erros). `LocalRentalNotifier` ganhou `debugPrint` nos `catch` (antes totalmente silenciosos) pra dar visibilidade em sessão de validação manual (T10) sobre falha de init/agendamento/cancelamento.
+
+T10 (validação manual em device) segue pendente — esta mudança não a substitui, só dá mais chance/visibilidade de ela funcionar.
 
 Sem dúvida em aberto pendente.

@@ -63,7 +63,9 @@ void main() {
     expect(find.byKey(TestKeys.extendRentalButton(rental.id, 10)), findsNothing);
   });
 
-  testWidgets('overtime alarm icon shows once a fixed-duration rental runs past its time', (tester) async {
+  testWidgets('overtime freezes the clock at 00:00 and shows "TEMPO ESGOTADO" once a fixed-duration rental runs past its time', (
+    tester,
+  ) async {
     await tester.pumpWidget(const SonhoDeCriancaApp());
     await tester.pump(const Duration(milliseconds: 400));
     final state = Provider.of<AppState>(tester.element(find.byType(MaterialApp)), listen: false);
@@ -82,9 +84,9 @@ void main() {
     await tester.scrollUntilVisible(card, 200, scrollable: find.byType(Scrollable).first);
     expect(card, findsOneWidget);
     // Scoped to this card — the seeded data has another rental already in
-    // overtime, so an unscoped `find.byIcon` would false-positive on it.
-    final alarmIcon = find.descendant(of: card, matching: find.byIcon(Icons.notifications_active_rounded));
-    expect(alarmIcon, findsNothing);
+    // overtime, so an unscoped `find.text` would false-positive on it.
+    final alarmLabel = find.descendant(of: card, matching: find.text('TEMPO ESGOTADO'));
+    expect(alarmLabel, findsNothing);
 
     // Back-date the start past the 10min duration.
     final index = state.rentals.indexWhere((r) => r.id == rental.id);
@@ -101,6 +103,8 @@ void main() {
     state.setTab(state.tab); // notifyListeners via a harmless no-op state change
     await tester.pump(const Duration(milliseconds: 400));
 
-    expect(alarmIcon, findsOneWidget);
+    expect(alarmLabel, findsOneWidget);
+    // Clock freezes at 00:00 instead of counting up past the duration.
+    expect(find.descendant(of: card, matching: find.text('00:00')), findsOneWidget);
   });
 }

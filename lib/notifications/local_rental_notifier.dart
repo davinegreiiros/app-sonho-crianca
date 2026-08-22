@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
@@ -42,16 +43,64 @@ class LocalRentalNotifier implements RentalNotifier {
           ?.requestPermissions(alert: true, badge: true, sound: true);
 
       _initialized = true;
-    } catch (_) {
+    } catch (e) {
       // Leaves `_initialized` false — the next schedule/cancel call tries
-      // `init()` again instead of silently assuming it's ready.
+      // `init()` again instead of silently assuming it's ready. Logged
+      // (debug builds only) so a device-validation session (spec 005 T10)
+      // can actually see *why* notifications aren't firing instead of a
+      // fully silent no-op — this was previously impossible to diagnose.
+      debugPrint('LocalRentalNotifier.init failed: $e');
     }
   }
 
-  /// Deterministic positive id from the rental's own id — lets a later
-  /// call cancel exactly the notification a given rental scheduled,
-  /// without keeping a separate id map anywhere.
-  int _idFor(String rentalId) => rentalId.hashCode & 0x7fffffff;
+  /// Deterministic positive id from a rental's id (or a derived key —
+  /// [scheduleRentalEndingSoon] uses `'${rentalId}_soon'` so both
+  /// notifications for the same rental get distinct ids and never
+  /// overwrite each other) — lets a later call cancel exactly the
+  /// notification that was scheduled, without keeping a separate id map
+  /// anywhere.
+  int _idFor(String key) => key.hashCode & 0x7fffffff;
+
+  Future<void> _schedule({required int id, required String title, required String body, required DateTime at, required String logLabel}) async {
+    await init();
+    if (!at.isAfter(DateTime.now())) return; // never schedule into the past
+
+    try {
+      await _plugin.zonedSchedule(
+        id,
+        title,
+        body,
+        tz.TZDateTime.from(at, tz.local),
+        NotificationDetails(
+          android: AndroidNotificationDetails(
+            _channelId,
+            _channelName,
+            channelDescription: _channelDescription,
+            importance: Importance.high,
+            priority: Priority.high,
+            // Body carries two lines (spec 009) — without this it can get
+            // truncated to one line in the collapsed notification shade.
+            styleInformation: BigTextStyleInformation(body),
+          ),
+          iOS: const DarwinNotificationDetails(),
+        ),
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+      );
+    } catch (e) {
+      // See the comment on `init()` — scheduling failing is never fatal.
+      debugPrint('LocalRentalNotifier.$logLabel failed: $e');
+    }
+  }
+
+  Future<void> _cancel({required int id, required String logLabel}) async {
+    try {
+      await _plugin.cancel(id);
+    } catch (e) {
+      // See the comment on `init()`.
+      debugPrint('LocalRentalNotifier.$logLabel failed: $e');
+    }
+  }
 
   @override
   Future<void> scheduleRentalEnd({
@@ -59,40 +108,20 @@ class LocalRentalNotifier implements RentalNotifier {
     required String title,
     required String body,
     required DateTime at,
-  }) async {
-    await init();
-    if (!at.isAfter(DateTime.now())) return; // never schedule into the past
-
-    try {
-      await _plugin.zonedSchedule(
-        _idFor(rentalId),
-        title,
-        body,
-        tz.TZDateTime.from(at, tz.local),
-        const NotificationDetails(
-          android: AndroidNotificationDetails(
-            _channelId,
-            _channelName,
-            channelDescription: _channelDescription,
-            importance: Importance.high,
-            priority: Priority.high,
-          ),
-          iOS: DarwinNotificationDetails(),
-        ),
-        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
-      );
-    } catch (_) {
-      // See the comment on `init()` — scheduling failing is never fatal.
-    }
-  }
+  }) => _schedule(id: _idFor(rentalId), title: title, body: body, at: at, logLabel: 'scheduleRentalEnd($rentalId)');
 
   @override
-  Future<void> cancelRentalEnd(String rentalId) async {
-    try {
-      await _plugin.cancel(_idFor(rentalId));
-    } catch (_) {
-      // See the comment on `init()`.
-    }
-  }
+  Future<void> cancelRentalEnd(String rentalId) => _cancel(id: _idFor(rentalId), logLabel: 'cancelRentalEnd($rentalId)');
+
+  @override
+  Future<void> scheduleRentalEndingSoon({
+    required String rentalId,
+    required String title,
+    required String body,
+    required DateTime at,
+  }) => _schedule(id: _idFor('${rentalId}_soon'), title: title, body: body, at: at, logLabel: 'scheduleRentalEndingSoon($rentalId)');
+
+  @override
+  Future<void> cancelRentalEndingSoon(String rentalId) =>
+      _cancel(id: _idFor('${rentalId}_soon'), logLabel: 'cancelRentalEndingSoon($rentalId)');
 }

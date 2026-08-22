@@ -52,4 +52,14 @@ Uma locação de tempo fixo ativa ganha um botão "+ tempo" com presets de 5/10/
 - **Presets de tempo:** botões +5/+10/+15 min (sem campo livre).
 - **Preço na extensão:** recalcula proporcional (taxa por minuto do brinquedo × minutos adicionados), somado ao preço já fixado.
 
-Sem dúvida em aberto pendente — spec pronta pra `plan.md`.
+## Amendment (2026-08-22, respostas do dono do produto)
+
+O reforço visual original (sino pulsando, relógio seguindo `+MM:SS` crescente) não bastou na prática — o operador não percebeu o fim do tempo. Trocado por:
+
+- **Relógio congela em `00:00`** quando `overtime == true`, em vez de continuar contando `+MM:SS` (perde a informação de "quanto tempo passou do combinado" — aceito, o operador já vê isso pelo selo abaixo em vez do relógio).
+- **Selo "TEMPO ESGOTADO" piscando** (`Pulse`, ícone `warning_rounded` + texto, mesma cor de urgência `statusColor`) substitui o ícone de sino — mais explícito que um ícone sozinho.
+- `StripedProgress` pulsante e a cor vermelha (`statusColor`) continuam como estavam, sem mudança.
+
+Implementado em `active_tab.dart` (`_ActiveCard`), coberto por `test/extend_time_widget_test.dart`.
+
+Sem dúvida em aberto pendente.
