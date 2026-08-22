@@ -166,6 +166,50 @@ class _CanhotoBadge extends StatelessWidget {
   Widget _notchDot() => Container(width: _notch, height: _notch, decoration: BoxDecoration(color: cardColor, shape: BoxShape.circle));
 }
 
+/// "+ tempo" chip row for a fixed-duration active rental (spec 008):
+/// 5/10/15 min presets, each calling [AppState.extendActive]. Never shown
+/// for "tempo corrido" (spec 006) rentals, which have no duration to
+/// extend.
+class _ExtendTimeRow extends StatelessWidget {
+  const _ExtendTimeRow({required this.state, required this.rentalId, required this.fg});
+  final AppState state;
+  final String rentalId;
+  final Color fg;
+
+  static const _presets = [5, 10, 15];
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(Icons.add_alarm_rounded, size: 14, color: fg.withValues(alpha: 0.7)),
+        const SizedBox(width: 6),
+        Text('+ tempo', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: fg.withValues(alpha: 0.7))),
+        const SizedBox(width: 8),
+        for (final m in _presets) ...[
+          Pressable(
+            child: OutlinedButton(
+              key: TestKeys.extendRentalButton(rentalId, m),
+              onPressed: () => state.extendActive(rentalId, m),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: fg,
+                side: BorderSide(color: fg.withValues(alpha: 0.25)),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(3)),
+                textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+              ),
+              child: Text('+$m'),
+            ),
+          ),
+          const SizedBox(width: 6),
+        ],
+      ],
+    );
+  }
+}
+
 /// Plain MM:SS of elapsed time, counting up — no `+`/overtime sign, since
 /// a "tempo corrido" rental (spec 006) has no target it can run over.
 String _fmtElapsed(double elapsedMin) {
@@ -250,6 +294,18 @@ class _ActiveCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 2),
                       ],
+                      // Overtime alarm (spec 008): extra visual reinforcement
+                      // beyond the red `color`/pulsing `StripedProgress`
+                      // already used below — no sound, per the decision
+                      // recorded in `specs/008-extensao-tempo-alarme/spec.md`.
+                      if (overtime) ...[
+                        Pulse(
+                          minOpacity: 0.15,
+                          period: const Duration(milliseconds: 700),
+                          child: Icon(Icons.notifications_active_rounded, size: 15, color: color),
+                        ),
+                        const SizedBox(width: 3),
+                      ],
                       Text(
                         openEnded ? _fmtElapsed(elapsedMin) : state.fmtClock(remainMin),
                         style: TextStyle(
@@ -277,6 +333,8 @@ class _ActiveCard extends StatelessWidget {
             const SizedBox(height: 8),
           ] else ...[
             StripedProgress(progress: progress, color: color, pulse: overtime && state.pulseOnOvertime),
+            const SizedBox(height: 8),
+            _ExtendTimeRow(state: state, rentalId: rental.id, fg: toy.ink.fg),
             const SizedBox(height: 8),
           ],
           Row(

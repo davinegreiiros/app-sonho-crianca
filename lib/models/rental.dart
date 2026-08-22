@@ -36,8 +36,10 @@ class Rental {
 
   /// `null` means this rental is "tempo corrido" (open-ended, spec 006):
   /// no fixed duration, the price is computed from elapsed time when it's
-  /// finished instead of being fixed at creation.
-  final int? durationMin;
+  /// finished instead of being fixed at creation. Mutable (not `final`,
+  /// same reasoning as `price` below): `AppState.extendActive` (spec 008)
+  /// adds minutes to an active fixed-duration rental.
+  int? durationMin;
 
   /// R$/min this open-ended rental charges — captured once at creation
   /// (the operator's chosen rate, defaulting to the toy's `price/blockMin`

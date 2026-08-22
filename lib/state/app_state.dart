@@ -336,6 +336,23 @@ class AppState extends ChangeNotifier {
     );
   }
 
+  /// Adds `addMinutes` to an active fixed-duration rental (spec 008): its
+  /// `durationMin` and `price` both grow (price proportionally, at the
+  /// toy's rate/min — same formula as `ratePerMinute`), and the end
+  /// notification (spec 005) is cancelled and rescheduled for the new,
+  /// later end time. No-op for `isOpenEnded` — "tempo corrido" has no
+  /// fixed duration to extend.
+  void extendActive(String rentalId, int addMinutes) {
+    final r = rentals.firstWhere((r) => r.id == rentalId, orElse: () => rentals.first);
+    if (r.isOpenEnded) return;
+    r.durationMin = r.durationMin! + addMinutes;
+    final rate = r.ratePerMinute ?? ratePerMinute(toyById(r.toyId));
+    r.price = ((r.price + rate * addMinutes) * 100).round() / 100;
+    notifications.cancelRentalEnd(r.id);
+    _scheduleEndNotification(r);
+    notifyListeners();
+  }
+
   void cancelActive(String id) {
     notifications.cancelRentalEnd(id);
     rentals.removeWhere((r) => r.id == id);

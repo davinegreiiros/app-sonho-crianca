@@ -22,6 +22,7 @@ class TestKeys {
   static ValueKey activeCardKey(String rentalId) => ValueKey('active_card_$rentalId');
   static ValueKey finishRentalButton(String rentalId) => ValueKey('finish_rental_$rentalId');
   static ValueKey cancelRentalButton(String rentalId) => ValueKey('cancel_rental_$rentalId');
+  static ValueKey extendRentalButton(String rentalId, int minutes) => ValueKey('extend_rental_${rentalId}_$minutes');
 
   static const confirmEndButton = ValueKey('confirm_end_button');
   static ValueKey paymentOption(String method) => ValueKey('payment_option_$method');
