@@ -16,12 +16,13 @@ class NewRentalSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
     final draft = state.draft;
-    final presets = const [10, 15, 30, 60];
+    final presets = const [5, 10, 30, 60];
 
     return DecoratedBox(
       decoration: const BoxDecoration(
         color: AppColors.bg,
-        borderRadius: BorderRadius.only(topLeft: Radius.circular(16), topRight: Radius.circular(16)),
+        borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(16), topRight: Radius.circular(16)),
       ),
       child: SafeArea(
         top: false,
@@ -32,11 +33,14 @@ class NewRentalSheet extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               const ClipRRect(
-                borderRadius: BorderRadius.only(topLeft: Radius.circular(16), topRight: Radius.circular(16)),
+                borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(16),
+                    topRight: Radius.circular(16)),
                 child: PrintStrip(height: 4),
               ),
               const SizedBox(height: 14),
-              const Text('Nova locação', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w600)),
+              const Text('Nova locação',
+                  style: TextStyle(fontSize: 19, fontWeight: FontWeight.w600)),
               const SizedBox(height: 12),
               const _FieldLabel('Brinquedo'),
               _Dropdown(state: state),
@@ -74,7 +78,7 @@ class NewRentalSheet extends StatelessWidget {
                         _TextInput(
                           key: TestKeys.draftGuardianPhoneField,
                           initial: draft.guardianPhone,
-                          hint: '(85) 9.....',
+                          hint: '(85) 9 9999-9999',
                           keyboardType: TextInputType.phone,
                           onChanged: state.setDraftPhone,
                         ),
@@ -120,14 +124,16 @@ class NewRentalSheet extends StatelessWidget {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const _FieldLabel('Taxa por minuto (R\$) — calculado ao finalizar'),
+                      const _FieldLabel(
+                          'Taxa por minuto (R\$) — calculado ao finalizar'),
                       _TextInput(
                         // Remounts (fresh `initialValue`) whenever the toy
                         // changes or the operator picks a new rate — same
                         // pattern the duration/price fields above use.
                         key: ValueKey('rate-${draft.toyId}-$effective'),
                         initial: effective.toStringAsFixed(2),
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
                         onChanged: (v) {
                           final n = double.tryParse(v.replaceAll(',', '.'));
                           if (n != null && n > 0) state.setDraftCustomRate(n);
@@ -136,7 +142,9 @@ class NewRentalSheet extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         'sugestão do catálogo: ${state.fmtMoney(suggested)}/min',
-                        style: TextStyle(fontSize: 11, color: AppColors.text.withValues(alpha: 0.55)),
+                        style: TextStyle(
+                            fontSize: 11,
+                            color: AppColors.text.withValues(alpha: 0.55)),
                       ),
                     ],
                   );
@@ -195,10 +203,13 @@ class NewRentalSheet extends StatelessWidget {
                         },
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppColors.text,
-                          side: BorderSide(color: AppColors.text.withValues(alpha: 0.16)),
+                          side: BorderSide(
+                              color: AppColors.text.withValues(alpha: 0.16)),
                           padding: const EdgeInsets.symmetric(vertical: 11),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(3)),
-                          textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(3)),
+                          textStyle: const TextStyle(
+                              fontSize: 14, fontWeight: FontWeight.w600),
                         ),
                         child: const Text('Cancelar'),
                       ),
@@ -221,8 +232,10 @@ class NewRentalSheet extends StatelessWidget {
                           foregroundColor: AppColors.bg,
                           elevation: 0,
                           padding: const EdgeInsets.symmetric(vertical: 11),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(3)),
-                          textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(3)),
+                          textStyle: const TextStyle(
+                              fontSize: 14, fontWeight: FontWeight.w600),
                         ),
                         child: const Text('Iniciar locação'),
                       ),
@@ -246,7 +259,9 @@ class _FieldLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
-      child: Text(text, style: TextStyle(fontSize: 12, color: AppColors.text.withValues(alpha: 0.7))),
+      child: Text(text,
+          style: TextStyle(
+              fontSize: 12, color: AppColors.text.withValues(alpha: 0.7))),
     );
   }
 }
@@ -274,7 +289,8 @@ class _TextInput extends StatelessWidget {
       decoration: InputDecoration(
         hintText: hint,
         isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
         filled: true,
         fillColor: AppColors.surface,
         border: OutlineInputBorder(
@@ -324,7 +340,11 @@ class _DropdownState extends State<_Dropdown> {
       padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        border: Border.all(color: _focused ? AppColors.accent : AppColors.text.withValues(alpha: 0.16), width: _focused ? 1.8 : 1),
+        border: Border.all(
+            color: _focused
+                ? AppColors.accent
+                : AppColors.text.withValues(alpha: 0.16),
+            width: _focused ? 1.8 : 1),
         borderRadius: BorderRadius.circular(3),
       ),
       child: DropdownButtonHideUnderline(
@@ -337,7 +357,8 @@ class _DropdownState extends State<_Dropdown> {
             for (final t in state.toys)
               DropdownMenuItem(
                 value: t.id,
-                child: Text('${t.name} — ${state.toyAvailable(t)} livre(s)', overflow: TextOverflow.ellipsis),
+                child: Text('${t.name} — ${state.toyAvailable(t)} livre(s)',
+                    overflow: TextOverflow.ellipsis),
               ),
           ],
           onChanged: (v) {
@@ -350,7 +371,11 @@ class _DropdownState extends State<_Dropdown> {
 }
 
 class _PresetButton extends StatelessWidget {
-  const _PresetButton({super.key, required this.label, required this.selected, required this.onTap});
+  const _PresetButton(
+      {super.key,
+      required this.label,
+      required this.selected,
+      required this.onTap});
   final String label;
   final bool selected;
   final VoidCallback onTap;
@@ -362,7 +387,10 @@ class _PresetButton extends StatelessWidget {
       style: OutlinedButton.styleFrom(
         backgroundColor: selected ? AppColors.accent : Colors.transparent,
         foregroundColor: selected ? AppColors.bg : AppColors.text,
-        side: BorderSide(color: selected ? AppColors.accent : AppColors.text.withValues(alpha: 0.16)),
+        side: BorderSide(
+            color: selected
+                ? AppColors.accent
+                : AppColors.text.withValues(alpha: 0.16)),
         padding: const EdgeInsets.symmetric(vertical: 9),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(3)),
         textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
