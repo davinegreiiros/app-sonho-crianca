@@ -285,6 +285,31 @@ class _ActiveCard extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
+                  // Overtime alarm (spec 008, amended 2026-08-22 per product
+                  // owner decision): once time's up the clock freezes at
+                  // 00:00 below instead of counting up past it, and this
+                  // blinking "TEMPO ESGOTADO" label is the reinforcement —
+                  // stronger and more explicit than the red color/pulsing
+                  // `StripedProgress` alone. No sound, per the original
+                  // spec 008 decision.
+                  if (overtime) ...[
+                    Pulse(
+                      minOpacity: 0.15,
+                      period: const Duration(milliseconds: 700),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.warning_rounded, size: 12, color: color),
+                          const SizedBox(width: 3),
+                          Text(
+                            'TEMPO ESGOTADO',
+                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0.4, color: color),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                  ],
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -294,20 +319,8 @@ class _ActiveCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 2),
                       ],
-                      // Overtime alarm (spec 008): extra visual reinforcement
-                      // beyond the red `color`/pulsing `StripedProgress`
-                      // already used below — no sound, per the decision
-                      // recorded in `specs/008-extensao-tempo-alarme/spec.md`.
-                      if (overtime) ...[
-                        Pulse(
-                          minOpacity: 0.15,
-                          period: const Duration(milliseconds: 700),
-                          child: Icon(Icons.notifications_active_rounded, size: 15, color: color),
-                        ),
-                        const SizedBox(width: 3),
-                      ],
                       Text(
-                        openEnded ? _fmtElapsed(elapsedMin) : state.fmtClock(remainMin),
+                        openEnded ? _fmtElapsed(elapsedMin) : state.fmtClock(overtime ? 0.0 : remainMin),
                         style: TextStyle(
                           fontFamily: 'monospace',
                           fontSize: 17,

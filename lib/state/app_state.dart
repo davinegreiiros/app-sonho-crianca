@@ -54,6 +54,11 @@ class AppState extends ChangeNotifier {
     _seed();
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) => notifyListeners());
     _loadBusinessSettings();
+    // Permission asked right at boot, not lazily on first rental (spec
+    // 005 amendment, 2026-08-22, product owner decision) — fire-and-forget:
+    // `init()` is idempotent and swallows its own errors (see
+    // `LocalRentalNotifier`), so it never delays or blocks app startup.
+    this.notifications.init();
   }
 
   /// Schedules/cancels "this rental's time is up" notifications (spec
@@ -323,25 +328,41 @@ class AppState extends ChangeNotifier {
   }
 
   /// Tempo corrido (spec 006) has no target end time to notify about —
-  /// only a fixed-duration rental gets a "time's up" notification.
+  /// only a fixed-duration rental gets the two notifications below (spec
+  /// 005 + spec 009): the "time's up" one, and a "5 minutes left"
+  /// heads-up before it.
   void _scheduleEndNotification(Rental rental) {
     if (rental.isOpenEnded) return;
     final toy = toyById(rental.toyId);
-    final (title, body) = rentalEndedNotificationText(childName: rental.childName, toyName: toy.name);
-    notifications.scheduleRentalEnd(
+    final endsAt = rental.startedAt.add(Duration(minutes: rental.durationMin!));
+
+    final (endTitle, endBody) = rentalEndedNotificationText(
+      childName: rental.childName,
+      toyName: toy.name,
+      durationMin: rental.durationMin!,
+      priceFormatted: fmtMoney(rental.price),
+    );
+    notifications.scheduleRentalEnd(rentalId: rental.id, title: endTitle, body: endBody, at: endsAt);
+
+    final (soonTitle, soonBody) = rentalEndingSoonNotificationText(
+      childName: rental.childName,
+      toyName: toy.name,
+      endsAt: endsAt,
+    );
+    notifications.scheduleRentalEndingSoon(
       rentalId: rental.id,
-      title: title,
-      body: body,
-      at: rental.startedAt.add(Duration(minutes: rental.durationMin!)),
+      title: soonTitle,
+      body: soonBody,
+      at: endsAt.subtract(const Duration(minutes: 5)),
     );
   }
 
   /// Adds `addMinutes` to an active fixed-duration rental (spec 008): its
   /// `durationMin` and `price` both grow (price proportionally, at the
-  /// toy's rate/min — same formula as `ratePerMinute`), and the end
-  /// notification (spec 005) is cancelled and rescheduled for the new,
-  /// later end time. No-op for `isOpenEnded` — "tempo corrido" has no
-  /// fixed duration to extend.
+  /// toy's rate/min — same formula as `ratePerMinute`), and both
+  /// notifications (spec 005 "time's up" + spec 009 "5 minutes left") are
+  /// cancelled and rescheduled for the new, later end time. No-op for
+  /// `isOpenEnded` — "tempo corrido" has no fixed duration to extend.
   void extendActive(String rentalId, int addMinutes) {
     final r = rentals.firstWhere((r) => r.id == rentalId, orElse: () => rentals.first);
     if (r.isOpenEnded) return;
@@ -349,12 +370,14 @@ class AppState extends ChangeNotifier {
     final rate = r.ratePerMinute ?? ratePerMinute(toyById(r.toyId));
     r.price = ((r.price + rate * addMinutes) * 100).round() / 100;
     notifications.cancelRentalEnd(r.id);
+    notifications.cancelRentalEndingSoon(r.id);
     _scheduleEndNotification(r);
     notifyListeners();
   }
 
   void cancelActive(String id) {
     notifications.cancelRentalEnd(id);
+    notifications.cancelRentalEndingSoon(id);
     rentals.removeWhere((r) => r.id == id);
     notifyListeners();
   }
@@ -407,6 +430,7 @@ class AppState extends ChangeNotifier {
     if (endPayment == null || endingId == null) return;
     final r = rentals.firstWhere((r) => r.id == endingId);
     notifications.cancelRentalEnd(r.id);
+    notifications.cancelRentalEndingSoon(r.id);
     // Reuse the price frozen when the Pix QR was generated, if there was
     // one — never recompute a tempo-corrido price after the QR was
     // already shown, or the amount charged could exceed what the

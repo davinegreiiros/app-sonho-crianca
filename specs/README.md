@@ -28,9 +28,10 @@ Sem `spec.md` aprovado, sem código de feature. Bugfix simples e chore não prec
 | [002](002-seguranca-dados/spec.md) | Segurança e proteção de dados | Draft | — (cross-cutting, bloqueia 004/005) |
 | [003](003-catalogo-tickets-tipo/spec.md) | Catálogo — tickets de disponibilidade + tipo do brinquedo | Implemented | 001 |
 | [004](004-pix-qrcode/spec.md) | QR Code Pix na finalização de locação | Implemented | 002 |
-| [005](005-notificacoes-locais/spec.md) | Notificações locais de fim de locação | Código completo, falta validar em device | 002 |
+| [005](005-notificacoes-locais/spec.md) | Notificações locais de fim de locação | Implemented | 002 |
 | [006](006-locacao-tempo-corrido/spec.md) | Locação em tempo corrido | Implemented | — |
 | [007](007-revisao-design-v3/spec.md) | Revisão de Design v3 — ícones categoria, canhoto, Pix, Configurações, tempo corrido | Implemented | 001, 003, 004, 006 |
 | [008](008-extensao-tempo-alarme/spec.md) | Adicionar tempo e alarme visual de tempo esgotado | Implemented | 005, 006 |
+| [009](009-notificacao-formato-aviso-previo/spec.md) | Notificação de tempo esgotado reformatada + aviso prévio de 5 min | Implemented | 005, 008 |
 
 Todas em `Draft` — cada uma tem "Dúvidas em aberto" que precisa de resposta sua antes de virar `Approved` e ganhar `plan.md`/`tasks.md`.

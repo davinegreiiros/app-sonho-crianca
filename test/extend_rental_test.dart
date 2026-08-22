@@ -1,7 +1,8 @@
 // Tests for spec 008 (adicionar tempo e alarme visual): extending an
 // active fixed-duration rental adds minutes and proportional price, and
-// reschedules its end notification; a tempo corrido (spec 006) rental is
-// untouched by it, since it has no fixed duration to extend.
+// reschedules both its end notification and its "5 minutes left"
+// heads-up (spec 009); a tempo corrido (spec 006) rental is untouched by
+// it, since it has no fixed duration to extend.
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -26,7 +27,9 @@ void main() {
     expect(rental.durationMin, 15);
     expect(rental.price, 8);
     final originalSchedule = notifier.scheduled[rental.id];
+    final originalSoonSchedule = notifier.scheduledEndingSoon[rental.id];
     expect(originalSchedule, rental.startedAt.add(const Duration(minutes: 15)));
+    expect(originalSoonSchedule, rental.startedAt.add(const Duration(minutes: 10)));
 
     state.extendActive(rental.id, 10);
 
@@ -34,6 +37,8 @@ void main() {
     expect(rental.price, 13); // 8 + 0.5/min * 10min
     expect(notifier.scheduled[rental.id], rental.startedAt.add(const Duration(minutes: 25)));
     expect(notifier.scheduled[rental.id], isNot(originalSchedule));
+    expect(notifier.scheduledEndingSoon[rental.id], rental.startedAt.add(const Duration(minutes: 20)));
+    expect(notifier.scheduledEndingSoon[rental.id], isNot(originalSoonSchedule));
     state.dispose();
   });
 
@@ -55,6 +60,7 @@ void main() {
     expect(rental.durationMin, isNull);
     expect(rental.price, priceBefore);
     expect(notifier.scheduled, isEmpty);
+    expect(notifier.scheduledEndingSoon, isEmpty);
     state.dispose();
   });
 }

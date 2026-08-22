@@ -25,4 +25,21 @@ abstract class RentalNotifier {
   /// already cancelled, finished, or never scheduled (tempo corrido, spec
   /// 006) is never an error.
   Future<void> cancelRentalEnd(String rentalId);
+
+  /// Schedules the "5 minutes left" heads-up for [at] (spec
+  /// 009-notificacao-formato-aviso-previo) — a separate notification from
+  /// [scheduleRentalEnd], for the same [rentalId]. A second call for the
+  /// same [rentalId] replaces the first, same as [scheduleRentalEnd].
+  Future<void> scheduleRentalEndingSoon({
+    required String rentalId,
+    required String title,
+    required String body,
+    required DateTime at,
+  });
+
+  /// Cancels a previously scheduled "5 minutes left" notification for
+  /// [rentalId], if any — independent from [cancelRentalEnd], since both
+  /// notifications exist for the same rental at once. A no-op if none was
+  /// scheduled.
+  Future<void> cancelRentalEndingSoon(String rentalId);
 }
