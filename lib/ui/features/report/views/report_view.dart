@@ -1,21 +1,25 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../domain/models/rental.dart';
-import '../../domain/models/toy.dart';
-import '../../state/app_state.dart';
-import '../../theme/app_colors.dart';
-import '../../widgets/animations/cascade.dart';
-import '../../widgets/animations/pressable.dart';
+import '../../../../domain/models/rental.dart';
+import '../../../../domain/models/toy.dart';
+import '../../../../theme/app_colors.dart';
+import '../../../../ui/core/formatters.dart';
+import '../../../../widgets/animations/cascade.dart';
+import '../../../../widgets/animations/pressable.dart';
+import '../view_models/report_cubit.dart';
+import '../view_models/report_state.dart';
 
-class ReportTab extends StatefulWidget {
-  const ReportTab({super.key});
+/// Migrated in spec 014-migracao-relatorio: reads/writes through
+/// [ReportCubit] instead of `AppState`.
+class ReportView extends StatefulWidget {
+  const ReportView({super.key});
 
   @override
-  State<ReportTab> createState() => _ReportTabState();
+  State<ReportView> createState() => _ReportViewState();
 }
 
-class _ReportTabState extends State<ReportTab> with TickerProviderStateMixin {
+class _ReportViewState extends State<ReportView> with TickerProviderStateMixin {
   CascadeController? _cascade;
 
   @override
@@ -26,18 +30,15 @@ class _ReportTabState extends State<ReportTab> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
-    final breakdown = state.paymentBreakdown;
-    final total = state.reportTotal;
-    final toyBreakdown = state.toyBreakdown;
-    final history = state.historyList;
+    final cubit = context.watch<ReportCubit>();
+    final report = cubit.state;
     _cascade ??= CascadeController(this, itemCount: PaymentMethod.values.length);
     final cascade = _cascade!;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 6, 20, 100),
       children: [
-        _PeriodSelector(state: state),
+        _PeriodSelector(cubit: cubit, period: report.period),
         const SizedBox(height: 18),
         Container(
           decoration: BoxDecoration(color: AppColors.accent100, borderRadius: BorderRadius.circular(4)),
@@ -50,11 +51,11 @@ class _ReportTabState extends State<ReportTab> with TickerProviderStateMixin {
                 style: TextStyle(fontSize: 10, letterSpacing: 1.3, fontWeight: FontWeight.w600, color: AppColors.accent700),
               ),
               Text(
-                state.fmtMoney(total),
+                formatMoney(report.total),
                 style: const TextStyle(fontSize: 34, fontWeight: FontWeight.w600, height: 1, color: AppColors.accent900),
               ),
               Text(
-                '${state.reportFiltered.length} ${state.reportFiltered.length == 1 ? 'locação' : 'locações'} no período',
+                '${report.filteredCount} ${report.filteredCount == 1 ? 'locação' : 'locações'} no período',
                 style: TextStyle(fontSize: 12, color: AppColors.accent900.withValues(alpha: 0.65)),
               ),
             ],
@@ -69,7 +70,11 @@ class _ReportTabState extends State<ReportTab> with TickerProviderStateMixin {
         for (var i = 0; i < PaymentMethod.values.length; i++)
           cascade.item(
             i,
-            child: _PaymentBar(state: state, method: PaymentMethod.values[i], amount: breakdown[PaymentMethod.values[i]] ?? 0, total: total),
+            child: _PaymentBar(
+              method: PaymentMethod.values[i],
+              amount: report.paymentBreakdown[PaymentMethod.values[i]] ?? 0,
+              total: report.total,
+            ),
           ),
         const SizedBox(height: 18),
         Text(
@@ -77,15 +82,15 @@ class _ReportTabState extends State<ReportTab> with TickerProviderStateMixin {
           style: TextStyle(fontSize: 10.5, letterSpacing: 1, color: AppColors.text.withValues(alpha: 0.6)),
         ),
         const SizedBox(height: 6),
-        for (final entry in toyBreakdown)
-          _ToyBreakdownRow(state: state, toy: entry.key, count: entry.value.count, amount: entry.value.total),
+        for (final entry in report.toyBreakdown)
+          _ToyBreakdownRow(toy: entry.toy, count: entry.count, amount: entry.total),
         const SizedBox(height: 18),
         Text(
           'HISTÓRICO',
           style: TextStyle(fontSize: 10.5, letterSpacing: 1, color: AppColors.text.withValues(alpha: 0.6)),
         ),
         const SizedBox(height: 6),
-        if (history.isEmpty)
+        if (report.historyList.isEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 10),
             child: Text(
@@ -94,15 +99,16 @@ class _ReportTabState extends State<ReportTab> with TickerProviderStateMixin {
             ),
           )
         else
-          for (final r in history) _HistoryRow(state: state, rental: r),
+          for (final r in report.historyList) _HistoryRow(rental: r, toy: report.toyById(r.toyId)),
       ],
     );
   }
 }
 
 class _PeriodSelector extends StatelessWidget {
-  const _PeriodSelector({required this.state});
-  final AppState state;
+  const _PeriodSelector({required this.cubit, required this.period});
+  final ReportCubit cubit;
+  final ReportPeriod period;
 
   @override
   Widget build(BuildContext context) {
@@ -128,10 +134,10 @@ class _PeriodSelector extends StatelessWidget {
   }
 
   Widget _buildSegment(BuildContext context, ({ReportPeriod p, String label}) o, bool isLast) {
-    final selected = state.reportPeriod == o.p;
+    final selected = period == o.p;
     return Pressable(
       child: InkWell(
-        onTap: () => state.setReportPeriod(o.p),
+        onTap: () => cubit.setPeriod(o.p),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 160),
           alignment: Alignment.center,
@@ -156,8 +162,7 @@ class _PeriodSelector extends StatelessWidget {
 }
 
 class _PaymentBar extends StatelessWidget {
-  const _PaymentBar({required this.state, required this.method, required this.amount, required this.total});
-  final AppState state;
+  const _PaymentBar({required this.method, required this.amount, required this.total});
   final PaymentMethod method;
   final double amount;
   final double total;
@@ -189,7 +194,7 @@ class _PaymentBar extends StatelessWidget {
           ),
           SizedBox(
             width: 64,
-            child: Text(state.fmtMoney(amount), textAlign: TextAlign.right, style: const TextStyle(fontSize: 13)),
+            child: Text(formatMoney(amount), textAlign: TextAlign.right, style: const TextStyle(fontSize: 13)),
           ),
         ],
       ),
@@ -198,8 +203,7 @@ class _PaymentBar extends StatelessWidget {
 }
 
 class _ToyBreakdownRow extends StatelessWidget {
-  const _ToyBreakdownRow({required this.state, required this.toy, required this.count, required this.amount});
-  final AppState state;
+  const _ToyBreakdownRow({required this.toy, required this.count, required this.amount});
   final Toy toy;
   final int count;
   final double amount;
@@ -218,7 +222,7 @@ class _ToyBreakdownRow extends StatelessWidget {
           ),
           Text('${count}x', style: TextStyle(fontSize: 12, color: AppColors.text.withValues(alpha: 0.6))),
           const SizedBox(width: 8),
-          Text(state.fmtMoney(amount), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+          Text(formatMoney(amount), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
         ],
       ),
     );
@@ -226,9 +230,9 @@ class _ToyBreakdownRow extends StatelessWidget {
 }
 
 class _HistoryRow extends StatelessWidget {
-  const _HistoryRow({required this.state, required this.rental});
-  final AppState state;
+  const _HistoryRow({required this.rental, required this.toy});
   final Rental rental;
+  final Toy toy;
 
   Color get _payBg => switch (rental.paymentMethod!) {
         PaymentMethod.pix => AppColors.accent100,
@@ -244,7 +248,6 @@ class _HistoryRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final toy = state.toyById(rental.toyId);
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 9),
       decoration: BoxDecoration(border: Border(bottom: BorderSide(color: AppColors.text.withValues(alpha: 0.08)))),
@@ -260,7 +263,7 @@ class _HistoryRow extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                 ),
-                Text(state.whenLabel(rental.endedAt!), style: TextStyle(fontSize: 11, color: AppColors.text.withValues(alpha: 0.6))),
+                Text(formatRelativeTime(rental.endedAt!), style: TextStyle(fontSize: 11, color: AppColors.text.withValues(alpha: 0.6))),
               ],
             ),
           ),
@@ -274,7 +277,7 @@ class _HistoryRow extends StatelessWidget {
           ),
           SizedBox(
             width: 52,
-            child: Text(state.fmtMoney(rental.price), textAlign: TextAlign.right, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+            child: Text(formatMoney(rental.price), textAlign: TextAlign.right, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
           ),
         ],
       ),

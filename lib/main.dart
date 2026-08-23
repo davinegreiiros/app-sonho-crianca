@@ -10,6 +10,7 @@ import 'state/app_state.dart';
 import 'theme/app_theme.dart';
 import 'ui/features/business_settings/view_models/business_settings_cubit.dart';
 import 'ui/features/catalog/view_models/toy_catalog_cubit.dart';
+import 'ui/features/report/view_models/report_cubit.dart';
 
 void main() {
   runApp(const SonhoDeCriancaApp());
@@ -35,10 +36,6 @@ class SonhoDeCriancaApp extends StatelessWidget {
         ChangeNotifierProvider<ToyRepository>(
           create: (_) => ToyRepository(),
         ),
-        // No Cubit consumes this one yet (spec
-        // 013-migracao-rental-repository-fundacao is foundation-only) —
-        // still shared via provider so the fatias 014-016 Cubits can read
-        // the exact same instance AppState already does when they land.
         ChangeNotifierProvider<RentalRepository>(
           create: (_) => RentalRepository(),
         ),
@@ -59,6 +56,9 @@ class SonhoDeCriancaApp extends StatelessWidget {
               ),
               BlocProvider<ToyCatalogCubit>(
                 create: (context) => ToyCatalogCubit(context.read<ToyRepository>()),
+              ),
+              BlocProvider<ReportCubit>(
+                create: (context) => ReportCubit(context.read<RentalRepository>(), context.read<ToyRepository>()),
               ),
             ],
             child: MaterialApp(

@@ -11,10 +11,9 @@ import '../notifications/local_rental_notifier.dart';
 import '../notifications/notification_texts.dart';
 import '../notifications/rental_notifier.dart';
 import '../theme/app_colors.dart';
+import '../ui/core/formatters.dart';
 
 enum AppTab { home, active, catalog, report }
-
-enum ReportPeriod { today, week, all }
 
 /// Draft form state for the "Nova locação" sheet.
 class RentalDraft {
@@ -140,7 +139,6 @@ class AppState extends ChangeNotifier {
   // ---- config (design-time props in the original, fixed defaults here) ----
   static const Color _alertColor = AppColors.statusUrgent;
   static const bool _pulseOnOvertime = true;
-  static const int _reportWindowDays = 14;
 
   late final Timer _ticker;
 
@@ -169,8 +167,6 @@ class AppState extends ChangeNotifier {
   /// there and then, no QR-wait window to freeze against).
   double? endFrozenPrice;
 
-  ReportPeriod reportPeriod = ReportPeriod.today;
-
   void _seed() {
     // Toys are seeded by ToyRepository, rentals by RentalRepository
     // (specs 012/013) — nothing to do here anymore beyond the draft,
@@ -196,7 +192,7 @@ class AppState extends ChangeNotifier {
 
   Toy toyById(String id) => toys.firstWhere((t) => t.id == id, orElse: () => toys.first);
 
-  String fmtMoney(double v) => 'R\$ ${v.toStringAsFixed(2).replaceAll('.', ',')}';
+  String fmtMoney(double v) => formatMoney(v);
 
   Color statusColor(double ratio, bool overtime) {
     if (overtime || ratio <= 0.2) return _alertColor;
@@ -213,13 +209,7 @@ class AppState extends ChangeNotifier {
     return '${overtime ? '+' : ''}${pad(mm)}:${pad(ss)}';
   }
 
-  String whenLabel(DateTime ts) {
-    final min = DateTime.now().difference(ts).inSeconds / 60;
-    if (min < 60) return 'há ${(min < 1 ? 1 : min.round())} min';
-    final h = min / 60;
-    if (h < 24) return 'há ${h.round()}h';
-    return 'há ${(h / 24).round()}d';
-  }
+  String whenLabel(DateTime ts) => formatRelativeTime(ts);
 
   int toyAvailable(Toy t) {
     final rented = rentals.where((r) => r.status == RentalStatus.active && r.toyId == t.id).length;
@@ -454,11 +444,6 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void setReportPeriod(ReportPeriod p) {
-    reportPeriod = p;
-    notifyListeners();
-  }
-
   void updateToyPrice(String id, double v) => _toyRepository.updatePrice(id, v);
 
   void updateToyBlock(String id, int v) => _toyRepository.updateBlockMinutes(id, v);
@@ -519,47 +504,6 @@ class AppState extends ChangeNotifier {
       return tb.compareTo(ta);
     });
     return combined.take(4).toList();
-  }
-
-  DateTime get _reportCutoff {
-    switch (reportPeriod) {
-      case ReportPeriod.today:
-        return _startOfDay;
-      case ReportPeriod.week:
-        return DateTime.now().subtract(const Duration(days: _reportWindowDays));
-      case ReportPeriod.all:
-        return DateTime.fromMillisecondsSinceEpoch(0);
-    }
-  }
-
-  List<Rental> get reportFiltered =>
-      doneAll.where((r) => r.endedAt != null && !r.endedAt!.isBefore(_reportCutoff)).toList();
-
-  double get reportTotal => reportFiltered.fold(0.0, (a, r) => a + r.price);
-
-  Map<PaymentMethod, double> get paymentBreakdown {
-    final map = <PaymentMethod, double>{};
-    for (final m in PaymentMethod.values) {
-      map[m] = reportFiltered.where((r) => r.paymentMethod == m).fold(0.0, (a, r) => a + r.price);
-    }
-    return map;
-  }
-
-  List<MapEntry<Toy, ({int count, double total})>> get toyBreakdown {
-    final totals = <String, ({int count, double total})>{};
-    for (final r in reportFiltered) {
-      final cur = totals[r.toyId] ?? (count: 0, total: 0.0);
-      totals[r.toyId] = (count: cur.count + 1, total: cur.total + r.price);
-    }
-    final entries = totals.entries.map((e) => MapEntry(toyById(e.key), e.value)).toList();
-    entries.sort((a, b) => b.value.total.compareTo(a.value.total));
-    return entries;
-  }
-
-  List<Rental> get historyList {
-    final list = [...reportFiltered];
-    list.sort((a, b) => b.endedAt!.compareTo(a.endedAt!));
-    return list;
   }
 
   String get kicker {

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../state/app_state.dart';
 import '../test_keys.dart';
 import '../theme/app_colors.dart';
+import '../ui/features/report/views/report_view.dart';
 import '../widgets/animations/bounce.dart';
 import '../widgets/animations/pressable.dart';
 import '../widgets/app_bottom_nav.dart';
@@ -12,7 +13,6 @@ import '../widgets/modal_launchers.dart';
 import 'tabs/active_tab.dart';
 import 'tabs/catalog_tab.dart';
 import 'tabs/home_tab.dart';
-import 'tabs/report_tab.dart';
 
 /// App scaffold: gradient header, tab body, bottom nav and the floating
 /// "+" action. The "nova locação" / "finalizar locação" flows are real
@@ -31,7 +31,7 @@ class HomeShell extends StatelessWidget {
         AppTab.home => const HomeTab(),
         AppTab.active => const ActiveTab(),
         AppTab.catalog => const CatalogTab(),
-        AppTab.report => const ReportTab(),
+        AppTab.report => const ReportView(),
       },
       floatingActionButton: Bouncy(
         height: 4,
