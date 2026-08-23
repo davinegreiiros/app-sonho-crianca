@@ -34,7 +34,7 @@ Sem `spec.md` aprovado, sem código de feature. Bugfix simples e chore não prec
 | [008](008-extensao-tempo-alarme/spec.md) | Adicionar tempo e alarme visual de tempo esgotado | Implemented | 005, 006 |
 | [009](009-notificacao-formato-aviso-previo/spec.md) | Notificação de tempo esgotado reformatada + aviso prévio de 5 min | Implemented | 005, 008 |
 | [010](010-migracao-arquitetura-camadas/spec.md) | Migração de arquitetura para camadas — fundação (spec guarda-chuva) | Implemented | — |
-| 011 | Migração: Configurações do negócio (Repository + Cubit + View) | Planned | 010 |
+| [011](011-migracao-configuracoes-negocio/spec.md) | Migração: Configurações do negócio (Repository + Cubit + View) | Implemented | 010 |
 | 012 | Migração: Catálogo (Repository + Cubit + Views) | Planned | 010, 011 |
 | 013 | Migração: Relatório | Planned | 010, 012 |
 | 014 | Migração: Locação (nova/ativa/encerrar) + PIX + notificações | Planned | 010, 012, 013 |

@@ -1,41 +1,44 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
-import '../domain/models/business_settings.dart';
-import '../services/pix_payload.dart';
-import '../state/app_state.dart';
-import '../test_keys.dart';
-import '../theme/app_colors.dart';
-import '../widgets/animations/bounce.dart';
-import '../widgets/animations/print_strip.dart';
-import '../widgets/animations/pressable.dart';
+import '../../../../domain/models/business_settings.dart';
+import '../../../../services/pix_payload.dart';
+import '../../../../test_keys.dart';
+import '../../../../theme/app_colors.dart';
+import '../../../../widgets/animations/bounce.dart';
+import '../../../../widgets/animations/print_strip.dart';
+import '../../../../widgets/animations/pressable.dart';
+import '../view_models/business_settings_cubit.dart';
 
 /// "Configurações do negócio" — name/city/Pix key used to generate the
 /// Pix QR at the end of a locação (spec 004-pix-qrcode). Persisted
-/// locally only — see `AppState.updateBusinessSettings` and
+/// locally only — see `BusinessSettingsRepository` and
 /// `specs/002-seguranca-dados/spec.md` (never hardcoded, never in git).
 ///
 /// A full-page destination (`Navigator.push`), not a bottom sheet — spec
 /// 007-revisao-design-v3, artboard 1d: "é destino de navegação, não
 /// formulário de fluxo".
-class BusinessSettingsScreen extends StatefulWidget {
-  const BusinessSettingsScreen({super.key, this.hint});
+///
+/// Migrated in spec 011-migracao-configuracoes-negocio: reads/writes
+/// through [BusinessSettingsCubit] instead of `AppState`.
+class BusinessSettingsView extends StatefulWidget {
+  const BusinessSettingsView({super.key, this.hint});
 
   /// Optional message shown above the form — used when this screen opens
   /// because the operator picked "Pix" before configuring anything yet.
   final String? hint;
 
   @override
-  State<BusinessSettingsScreen> createState() => _BusinessSettingsScreenState();
+  State<BusinessSettingsView> createState() => _BusinessSettingsViewState();
 }
 
-class _BusinessSettingsScreenState extends State<BusinessSettingsScreen> {
+class _BusinessSettingsViewState extends State<BusinessSettingsView> {
   late final _nameCtrl = TextEditingController(text: _settings.merchantName);
   late final _cityCtrl = TextEditingController(text: _settings.merchantCity);
   late final _pixKeyCtrl = TextEditingController(text: _settings.pixKey);
 
-  BusinessSettings get _settings => context.read<AppState>().businessSettings;
+  BusinessSettings get _settings => context.read<BusinessSettingsCubit>().state.settings;
 
   @override
   void initState() {
@@ -55,9 +58,9 @@ class _BusinessSettingsScreenState extends State<BusinessSettingsScreen> {
 
   bool get _valid => _nameCtrl.text.trim().isNotEmpty && _cityCtrl.text.trim().isNotEmpty && _pixKeyCtrl.text.trim().isNotEmpty;
 
-  void _save(AppState state) {
+  void _save(BusinessSettingsCubit cubit) {
     if (!_valid) return;
-    state.updateBusinessSettings(
+    cubit.save(
       merchantName: _nameCtrl.text.trim(),
       merchantCity: _cityCtrl.text.trim(),
       pixKey: _pixKeyCtrl.text.trim(),
@@ -67,7 +70,7 @@ class _BusinessSettingsScreenState extends State<BusinessSettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
+    final cubit = context.watch<BusinessSettingsCubit>();
     // Preview only — never persisted, never sent anywhere. Built from
     // whatever's typed so far, amount 0 (a placeholder charge amount is
     // fine for a QR that only exists to show the operator "this is what
@@ -207,7 +210,7 @@ class _BusinessSettingsScreenState extends State<BusinessSettingsScreen> {
                     child: Pressable(
                       child: ElevatedButton(
                         key: TestKeys.saveBusinessSettingsButton,
-                        onPressed: _valid ? () => _save(state) : null,
+                        onPressed: _valid ? () => _save(cubit) : null,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.accent,
                           foregroundColor: AppColors.bg,

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../screens/business_settings_screen.dart';
 import '../state/app_state.dart';
 import '../theme/app_colors.dart';
+import '../ui/features/business_settings/views/business_settings_view.dart';
 import 'add_toy_sheet.dart';
 import 'end_rental_dialog.dart';
 import 'new_rental_sheet.dart';
@@ -71,6 +71,6 @@ Future<void> showAddToySheet(BuildContext context) {
 /// this was triggered by picking "Pix" before anything was configured yet.
 Future<void> openBusinessSettingsScreen(BuildContext context, {String? hint}) {
   return Navigator.of(context).push<void>(
-    MaterialPageRoute(builder: (context) => BusinessSettingsScreen(hint: hint)),
+    MaterialPageRoute(builder: (context) => BusinessSettingsView(hint: hint)),
   );
 }

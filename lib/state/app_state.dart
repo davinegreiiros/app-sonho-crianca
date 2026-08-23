@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
+import '../data/repositories/business_settings_repository.dart';
 import '../domain/models/business_settings.dart';
 import '../domain/models/rental.dart';
 import '../domain/models/toy.dart';
@@ -50,10 +50,18 @@ class RentalDraft {
 /// end-rental flow, and the report period filter. A 1s ticker keeps active
 /// rental countdowns live.
 class AppState extends ChangeNotifier {
-  AppState({RentalNotifier? notifications}) : notifications = notifications ?? LocalRentalNotifier() {
+  AppState({RentalNotifier? notifications, BusinessSettingsRepository? businessSettingsRepository})
+      : notifications = notifications ?? LocalRentalNotifier(),
+        _businessSettingsRepository = businessSettingsRepository ?? BusinessSettingsRepository(),
+        _ownsBusinessSettingsRepository = businessSettingsRepository == null {
     _seed();
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) => notifyListeners());
-    _loadBusinessSettings();
+    // BusinessSettings ownership moved to BusinessSettingsRepository (spec
+    // 011-migracao-configuracoes-negocio) — AppState only relays its
+    // changes so end_rental_dialog.dart/pix_qr_sheet.dart (not migrated
+    // yet, fatia 014) keep working unchanged off `businessSettings` below.
+    _businessSettingsRepository.addListener(notifyListeners);
+    _businessSettingsRepository.load();
     // Permission asked right at boot, not lazily on first rental (spec
     // 005 amendment, 2026-08-22, product owner decision) — fire-and-forget:
     // `init()` is idempotent and swallows its own errors (see
@@ -66,46 +74,30 @@ class AppState extends ChangeNotifier {
   /// instead of hitting a real platform channel — see `RentalNotifier`.
   final RentalNotifier notifications;
 
-  static const _prefsMerchantName = 'business_merchant_name';
-  static const _prefsMerchantCity = 'business_merchant_city';
-  static const _prefsPixKey = 'business_pix_key';
+  /// Single source of truth for `BusinessSettings` (spec
+  /// 011-migracao-configuracoes-negocio) — shared with
+  /// `BusinessSettingsCubit` in production (wired in `main.dart`); tests
+  /// that don't pass one get their own default instance, same pattern as
+  /// [notifications]/`LocalRentalNotifier`.
+  final BusinessSettingsRepository _businessSettingsRepository;
 
-  BusinessSettings businessSettings = const BusinessSettings();
+  /// Whether this `AppState` created its own default
+  /// [_businessSettingsRepository] (no shared instance was injected) —
+  /// only then does [dispose] also dispose the repository; a shared
+  /// instance (e.g. wired in `main.dart` alongside `BusinessSettingsCubit`)
+  /// outlives any single `AppState` and is disposed by whoever created it.
+  final bool _ownsBusinessSettingsRepository;
 
-  /// Set by [dispose]. [_loadBusinessSettings]'s `await` can resolve after
-  /// this `AppState` is already gone (e.g. a test builds one, asserts, and
-  /// disposes it before `SharedPreferences.getInstance()` gets back) —
-  /// `notifyListeners()` on a disposed `ChangeNotifier` throws, so every
-  /// callback that survives an `await` checks this first.
-  bool _disposed = false;
-
-  /// Loads the persisted Pix/business config, if any, from local device
-  /// storage (spec 004-pix-qrcode) — never from the network, never
-  /// bundled with the app. Starts with empty defaults and notifies once
-  /// this resolves, same pattern as any other async-at-boot state.
-  Future<void> _loadBusinessSettings() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (_disposed) return;
-    businessSettings = BusinessSettings(
-      merchantName: prefs.getString(_prefsMerchantName) ?? '',
-      merchantCity: prefs.getString(_prefsMerchantCity) ?? '',
-      pixKey: prefs.getString(_prefsPixKey) ?? '',
-    );
-    notifyListeners();
-  }
+  BusinessSettings get businessSettings => _businessSettingsRepository.settings;
 
   Future<void> updateBusinessSettings({
     required String merchantName,
     required String merchantCity,
     required String pixKey,
-  }) async {
-    businessSettings = BusinessSettings(merchantName: merchantName, merchantCity: merchantCity, pixKey: pixKey);
-    notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    if (_disposed) return;
-    await prefs.setString(_prefsMerchantName, merchantName);
-    await prefs.setString(_prefsMerchantCity, merchantCity);
-    await prefs.setString(_prefsPixKey, pixKey);
+  }) {
+    return _businessSettingsRepository.update(
+      BusinessSettings(merchantName: merchantName, merchantCity: merchantCity, pixKey: pixKey),
+    );
   }
 
   // ---- config (design-time props in the original, fixed defaults here) ----
@@ -175,8 +167,9 @@ class AppState extends ChangeNotifier {
 
   @override
   void dispose() {
-    _disposed = true;
     _ticker.cancel();
+    _businessSettingsRepository.removeListener(notifyListeners);
+    if (_ownsBusinessSettingsRepository) _businessSettingsRepository.dispose();
     super.dispose();
   }
 
