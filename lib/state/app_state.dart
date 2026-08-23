@@ -2,9 +2,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../models/business_settings.dart';
-import '../models/rental.dart';
-import '../models/toy.dart';
+import '../domain/models/business_settings.dart';
+import '../domain/models/rental.dart';
+import '../domain/models/toy.dart';
 import '../notifications/local_rental_notifier.dart';
 import '../notifications/notification_texts.dart';
 import '../notifications/rental_notifier.dart';

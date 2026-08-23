@@ -33,5 +33,10 @@ Sem `spec.md` aprovado, sem código de feature. Bugfix simples e chore não prec
 | [007](007-revisao-design-v3/spec.md) | Revisão de Design v3 — ícones categoria, canhoto, Pix, Configurações, tempo corrido | Implemented | 001, 003, 004, 006 |
 | [008](008-extensao-tempo-alarme/spec.md) | Adicionar tempo e alarme visual de tempo esgotado | Implemented | 005, 006 |
 | [009](009-notificacao-formato-aviso-previo/spec.md) | Notificação de tempo esgotado reformatada + aviso prévio de 5 min | Implemented | 005, 008 |
+| [010](010-migracao-arquitetura-camadas/spec.md) | Migração de arquitetura para camadas — fundação (spec guarda-chuva) | Implemented | — |
+| 011 | Migração: Configurações do negócio (Repository + Cubit + View) | Planned | 010 |
+| 012 | Migração: Catálogo (Repository + Cubit + Views) | Planned | 010, 011 |
+| 013 | Migração: Relatório | Planned | 010, 012 |
+| 014 | Migração: Locação (nova/ativa/encerrar) + PIX + notificações | Planned | 010, 012, 013 |
 
 Todas em `Draft` — cada uma tem "Dúvidas em aberto" que precisa de resposta sua antes de virar `Approved` e ganhar `plan.md`/`tasks.md`.

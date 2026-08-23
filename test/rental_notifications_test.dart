@@ -8,7 +8,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:sonho_de_crianca/models/rental.dart';
+import 'package:sonho_de_crianca/domain/models/rental.dart';
 import 'package:sonho_de_crianca/state/app_state.dart';
 
 import 'fakes/fake_rental_notifier.dart';

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
-import '../../models/toy.dart';
+import '../../domain/models/toy.dart';
 import '../../state/app_state.dart';
 import '../../test_keys.dart';
 import '../../theme/app_colors.dart';

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-import '../models/toy.dart';
+import '../domain/models/toy.dart';
 
 /// Phosphor-duotone glyph for a [ToyCategory] (`assets/icons/category/`),
 /// retinted to [color] via `BlendMode.srcIn` — the SVG's own opacity-0.25

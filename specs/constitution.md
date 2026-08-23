@@ -5,17 +5,23 @@ Princípios não-negociáveis do projeto. Toda spec, plano e tarefa deve respeit
 ## Stack
 
 - Flutter (Dart SDK ^3.12.2), Material.
-- State management: `provider` (ChangeNotifier em `lib/state/`). Não introduzir Riverpod/Bloc/GetX sem atualizar esta constitution primeiro.
+- State management: camada ViewModel usa `Cubit` (`flutter_bloc`), adotado em [specs/010-migracao-arquitetura-camadas](010-migracao-arquitetura-camadas/spec.md). `provider` continua em uso para injeção de dependência de Services/Repositories (`Provider`/`MultiProvider`); `Cubit`s são expostos pela árvore de widgets via `BlocProvider`/`MultiBlocProvider`. Não introduzir Bloc "evento puro" (event-based), Riverpod ou GetX sem atualizar esta constitution primeiro.
+- Comparação de igualdade das classes de estado do `Cubit`: `equatable`. Não usar `freezed`/`built_value` sem necessidade comprovada — evita dependência de codegen/`build_runner` (ver dúvida resolvida em specs/010).
 - Fontes: `google_fonts`. Ícones: `cupertino_icons` + assets próprios.
 
 ## Arquitetura
 
-- `lib/models/` — dados puros (Toy, Rental), sem lógica de UI.
-- `lib/state/` — `AppState` (ChangeNotifier), única fonte de verdade de estado de app.
-- `lib/screens/` — telas completas (rotas).
-- `lib/widgets/` — componentes reutilizáveis / dialogs / sheets.
-- `lib/theme/` — cores e tema centralizados. Nunca hardcode cor solta num widget — usar `AppColors`/`AppTheme`.
-- `lib/test_keys.dart` — `Key`s centralizadas para testes de widget/integration. Todo widget testável ganha chave aqui, não string solta no meio do código.
+Arquitetura em camadas, adotada em [specs/010-migracao-arquitetura-camadas](010-migracao-arquitetura-camadas/spec.md) e migrada de forma incremental, fatiada por feature (backlog em `specs/README.md`). Durante a transição, a estrutura antiga (`lib/models/`, `lib/state/`, `lib/screens/`, `lib/widgets/`) coexiste com a nova nas partes do app ainda não migradas — nenhuma spec de migração pode deixar o app quebrado no meio do caminho (regra de não-quebra).
+
+- `lib/data/services/` — classes stateless que encapsulam acesso externo (notificações locais, geração de payload PIX, etc.). Substituem `lib/notifications/*` e `lib/services/*` conforme migradas.
+- `lib/data/repositories/` — um repository por domínio (`ToyRepository`, `RentalRepository`, `BusinessSettingsRepository`), fonte única de verdade de dado/negócio daquele domínio, consumindo Services. Substituem o `AppState` único conforme migrados.
+- `lib/domain/models/` — modelos de domínio imutáveis (Toy, Rental, BusinessSettings), sem lógica de UI. Classes imutáveis escritas à mão, sem `freezed`/`built_value` — mesmo padrão que já existia em `lib/models/`. Substituem `lib/models/`.
+- `lib/domain/use_cases/` — só quando a lógica for complexa ou reusada por mais de um `Cubit` (ex.: cálculo de valor/tempo de locação, geração de payload PIX). CRUD simples vai direto Repository → Cubit, sem use case.
+- `lib/ui/core/` — widgets/tema genéricos e reutilizáveis entre features (sucessor de `lib/widgets/` + `lib/theme/` para o que não for específico de uma tela).
+- `lib/ui/features/<feature>/view_models/` — um `Cubit<EstadoDaTela>` por tela/feature, injetando Repository(s)/Use Case(s) via construtor. Substituem o acesso direto e amplo ao `AppState` global.
+- `lib/ui/features/<feature>/views/` — telas "burras", sucessoras de `lib/screens/*`, que só leem estado do `Cubit` (`BlocBuilder`/`BlocListener`/`BlocConsumer`) e disparam métodos dele, sem lógica de negócio inline.
+- `lib/theme/` — cores e tema centralizados enquanto não migrado para `lib/ui/core/`. Nunca hardcode cor solta num widget — usar `AppColors`/`AppTheme`.
+- `lib/test_keys.dart` — inalterado: `Key`s centralizadas para testes de widget/integration. Todo widget testável ganha chave aqui, não string solta no meio do código.
 
 ## Qualidade
 

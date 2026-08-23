@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart' show Color;
 
-import '../theme/app_colors.dart';
+import '../../theme/app_colors.dart';
 
 /// Fixed set of toy categories — every toy (seed or user-added) declares
 /// one, shown as a tag on its catalog card. Closed list decided in
