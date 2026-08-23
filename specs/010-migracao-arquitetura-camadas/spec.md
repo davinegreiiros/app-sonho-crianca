@@ -33,11 +33,13 @@ Escolhido: guarda-chuva + fatias por feature, cada uma spec própria (`spec.md`/
 |---|---|---|---|
 | 010 (esta) | Fundação | Estrutura de pastas `data/domain/ui`, `flutter_bloc`+`equatable` no `pubspec.yaml`, `lib/models/` → `lib/domain/models/` (só mover, sem criar Cubit/View ainda) | Muito baixo |
 | 011 | Configurações do negócio | `business_settings_screen.dart` → `BusinessSettingsRepository` + `BusinessSettingsCubit` + View | Baixo — 1 tela, CRUD simples, bom primeiro Cubit real pra validar o padrão |
-| 012 | Catálogo | `catalog_tab.dart`, `add_toy_sheet.dart` → `ToyRepository` + `ToyCatalogCubit` + Views | Médio |
+| 012 | Catálogo — criação de brinquedo | `add_toy_sheet.dart` → `ToyRepository` + `ToyCatalogCubit` + View. **Não inclui `catalog_tab.dart`** — ver nota de aprendizado abaixo. | Baixo |
 | 013 | Relatório | `report_tab.dart` → provavelmente só leitura derivada de `RentalRepository`, sem Cubit próprio ou com um Cubit fino | Baixo |
-| 014 | Locação (nova/ativa/encerrar) + PIX + notificações | `home_tab.dart`, `active_tab.dart`, `new_rental_sheet.dart`, `end_rental_dialog.dart`, `lib/services/pix_payload.dart`, `lib/notifications/*` → `RentalRepository` + `Cubit`(s) de locação, `Service`s de PIX/notificação | Alto — timers, notificação local, PIX; migrar por último e considerar sub-fatiar (ex.: criar locação vs. encerrar/timer) no `plan.md` de quando chegar lá |
+| 014 | Locação (nova/ativa/encerrar) + PIX + notificações + grade do catálogo | `home_tab.dart`, `active_tab.dart`, `new_rental_sheet.dart`, `end_rental_dialog.dart`, `lib/services/pix_payload.dart`, `lib/notifications/*`, **e `catalog_tab.dart`** → `RentalRepository` + `Cubit`(s) de locação, `Service`s de PIX/notificação | Alto — timers, notificação local, PIX; migrar por último e considerar sub-fatiar (ex.: criar locação vs. encerrar/timer) no `plan.md` de quando chegar lá |
 
 Cada fatia só começa quando a anterior estiver `Implemented` (constitution: zero-breakage, sem duas fatias arquiteturais em paralelo). Números exatos (011, 012...) confirmados na hora de criar cada pasta, respeitando a numeração sequencial do `specs/README.md`.
+
+**Aprendizado da fatia 012** (2026-08-23, ajuste permitido pela dúvida não-bloqueante já registrada abaixo): `catalog_tab.dart` (a grade com os "tickets" de disponibilidade) chama `AppState.toyAvailable(Toy)`, que cruza `Toy.qty` com `rentals` ativas — uma consulta genuinamente cross-repository (`Toy` + `Rental`), não resolvível só com `ToyRepository`. Como `RentalRepository` só existe na fatia 014, mover `catalog_tab.dart` pro `ToyCatalogCubit` agora exigiria ou (a) o Cubit depender de `AppState` (inverte a direção da migração) ou (b) uma dependência prematura em locação. Decisão: `add_toy_sheet.dart` (criação pura de brinquedo, sem tocar em locação) migra na 012; `catalog_tab.dart` migra junto da 014, quando um pequeno `ComputeToyAvailability` (use case cross-repository, `ToyRepository` + `RentalRepository`) resolve isso de forma limpa.
 
 ## Fora de escopo (desta spec 010 especificamente)
 

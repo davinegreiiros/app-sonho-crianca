@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../data/repositories/business_settings_repository.dart';
+import '../data/repositories/toy_repository.dart';
 import '../domain/models/business_settings.dart';
 import '../domain/models/rental.dart';
 import '../domain/models/toy.dart';
@@ -50,11 +51,15 @@ class RentalDraft {
 /// end-rental flow, and the report period filter. A 1s ticker keeps active
 /// rental countdowns live.
 class AppState extends ChangeNotifier {
-  AppState({RentalNotifier? notifications, BusinessSettingsRepository? businessSettingsRepository})
-      : notifications = notifications ?? LocalRentalNotifier(),
+  AppState({
+    RentalNotifier? notifications,
+    BusinessSettingsRepository? businessSettingsRepository,
+    ToyRepository? toyRepository,
+  })  : notifications = notifications ?? LocalRentalNotifier(),
         _businessSettingsRepository = businessSettingsRepository ?? BusinessSettingsRepository(),
-        _ownsBusinessSettingsRepository = businessSettingsRepository == null {
-    _seed();
+        _ownsBusinessSettingsRepository = businessSettingsRepository == null,
+        _toyRepository = toyRepository ?? ToyRepository(),
+        _ownsToyRepository = toyRepository == null {
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) => notifyListeners());
     // BusinessSettings ownership moved to BusinessSettingsRepository (spec
     // 011-migracao-configuracoes-negocio) — AppState only relays its
@@ -62,6 +67,14 @@ class AppState extends ChangeNotifier {
     // yet, fatia 014) keep working unchanged off `businessSettings` below.
     _businessSettingsRepository.addListener(notifyListeners);
     _businessSettingsRepository.load();
+    // Toy ownership moved to ToyRepository (spec
+    // 012-migracao-catalogo-criacao) — same relay pattern, needed by
+    // every other tab/sheet that reads `toys`/`toyById` and hasn't
+    // migrated yet. ToyRepository seeds itself synchronously (no
+    // SharedPreferences involved), so `_seed()` below can rely on `toys`
+    // already being populated.
+    _toyRepository.addListener(notifyListeners);
+    _seed();
     // Permission asked right at boot, not lazily on first rental (spec
     // 005 amendment, 2026-08-22, product owner decision) — fire-and-forget:
     // `init()` is idempotent and swallows its own errors (see
@@ -88,6 +101,13 @@ class AppState extends ChangeNotifier {
   /// outlives any single `AppState` and is disposed by whoever created it.
   final bool _ownsBusinessSettingsRepository;
 
+  /// Single source of truth for the toy catalog (spec
+  /// 012-migracao-catalogo-criacao) — shared with `ToyCatalogCubit` in
+  /// production (wired in `main.dart`); same opt-in pattern as
+  /// [_businessSettingsRepository].
+  final ToyRepository _toyRepository;
+  final bool _ownsToyRepository;
+
   BusinessSettings get businessSettings => _businessSettingsRepository.settings;
 
   Future<void> updateBusinessSettings({
@@ -108,7 +128,7 @@ class AppState extends ChangeNotifier {
   late final Timer _ticker;
 
   AppTab tab = AppTab.home;
-  List<Toy> toys = [];
+  List<Toy> get toys => _toyRepository.toys;
   List<Rental> rentals = [];
 
   bool showNew = false;
@@ -135,7 +155,8 @@ class AppState extends ChangeNotifier {
   ReportPeriod reportPeriod = ReportPeriod.today;
 
   void _seed() {
-    toys = kInitialToys.map((t) => t).toList();
+    // Toys are seeded by ToyRepository itself (spec
+    // 012-migracao-catalogo-criacao) — nothing to do here anymore.
 
     DateTime minAgo(num n) => DateTime.now().subtract(Duration(seconds: (n * 60).round()));
     DateTime dAgo(num n) => DateTime.now().subtract(Duration(seconds: (n * 86400).round()));
@@ -170,6 +191,8 @@ class AppState extends ChangeNotifier {
     _ticker.cancel();
     _businessSettingsRepository.removeListener(notifyListeners);
     if (_ownsBusinessSettingsRepository) _businessSettingsRepository.dispose();
+    _toyRepository.removeListener(notifyListeners);
+    if (_ownsToyRepository) _toyRepository.dispose();
     super.dispose();
   }
 
@@ -441,15 +464,9 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void updateToyPrice(String id, double v) {
-    toys = toys.map((t) => t.id == id ? t.copyWith(price: v) : t).toList();
-    notifyListeners();
-  }
+  void updateToyPrice(String id, double v) => _toyRepository.updatePrice(id, v);
 
-  void updateToyBlock(String id, int v) {
-    toys = toys.map((t) => t.id == id ? t.copyWith(blockMin: v) : t).toList();
-    notifyListeners();
-  }
+  void updateToyBlock(String id, int v) => _toyRepository.updateBlockMinutes(id, v);
 
   void addToy({
     required String name,
@@ -460,12 +477,15 @@ class AppState extends ChangeNotifier {
     required ToyCategory category,
     int qty = 1,
   }) {
-    final id = 'custom_${DateTime.now().microsecondsSinceEpoch}';
-    toys = [
-      ...toys,
-      Toy(id: id, name: name, qty: qty, blockMin: blockMin, price: price, ink: ink, imageKey: imageKey, category: category),
-    ];
-    notifyListeners();
+    _toyRepository.addNew(
+      name: name,
+      price: price,
+      blockMin: blockMin,
+      ink: ink,
+      imageKey: imageKey,
+      category: category,
+      qty: qty,
+    );
   }
 
   bool toyHasRentals(String id) => rentals.any((r) => r.toyId == id);
@@ -473,10 +493,11 @@ class AppState extends ChangeNotifier {
   /// Removes a toy from the catalog. Refuses (returns false) if any
   /// rental — active or in history — still references it, since
   /// [toyById]'s fallback would otherwise silently mislabel that entry.
+  /// The guard stays here (not in `ToyRepository`) because it needs
+  /// [rentals], a different domain that repository doesn't know about.
   bool removeToy(String id) {
     if (toyHasRentals(id)) return false;
-    toys = toys.where((t) => t.id != id).toList();
-    notifyListeners();
+    _toyRepository.remove(id);
     return true;
   }
 

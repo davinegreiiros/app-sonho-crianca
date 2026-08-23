@@ -1,24 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../domain/models/toy.dart';
-import '../state/app_state.dart';
-import '../test_keys.dart';
-import '../theme/app_colors.dart';
-import 'animations/pressable.dart';
-import 'category_icon.dart';
+import '../../../../domain/models/toy.dart';
+import '../../../../test_keys.dart';
+import '../../../../theme/app_colors.dart';
+import '../../../../widgets/animations/pressable.dart';
+import '../../../../widgets/category_icon.dart';
+import '../view_models/toy_catalog_cubit.dart';
 
 /// "Novo brinquedo" bottom sheet: name, a scrollable grid of illustrated
 /// icon options, quantity/price/duration and an ink color pick.
-class AddToySheet extends StatefulWidget {
-  const AddToySheet({super.key});
+///
+/// Migrated in spec 012-migracao-catalogo-criacao: writes through
+/// [ToyCatalogCubit] instead of `AppState`.
+class AddToySheetView extends StatefulWidget {
+  const AddToySheetView({super.key});
 
   @override
-  State<AddToySheet> createState() => _AddToySheetState();
+  State<AddToySheetView> createState() => _AddToySheetViewState();
 }
 
-class _AddToySheetState extends State<AddToySheet> {
+class _AddToySheetViewState extends State<AddToySheetView> {
   final _nameCtrl = TextEditingController();
   final _qtyCtrl = TextEditingController(text: '1');
   final _priceCtrl = TextEditingController(text: '10');
@@ -43,9 +46,9 @@ class _AddToySheetState extends State<AddToySheet> {
       (double.tryParse(_priceCtrl.text) ?? -1) >= 0 &&
       _category != null;
 
-  void _submit(AppState state) {
+  void _submit(ToyCatalogCubit cubit) {
     if (!_valid) return;
-    state.addToy(
+    cubit.addToy(
       name: _nameCtrl.text.trim(),
       price: double.parse(_priceCtrl.text),
       blockMin: int.parse(_minutesCtrl.text),
@@ -59,7 +62,7 @@ class _AddToySheetState extends State<AddToySheet> {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
+    final cubit = context.read<ToyCatalogCubit>();
     return DecoratedBox(
       decoration: const BoxDecoration(
         color: AppColors.bg,
@@ -201,7 +204,7 @@ class _AddToySheetState extends State<AddToySheet> {
                     child: Pressable(
                       child: ElevatedButton(
                         key: TestKeys.addToySubmitButton,
-                        onPressed: _valid ? () => _submit(state) : null,
+                        onPressed: _valid ? () => _submit(cubit) : null,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.accent,
                           foregroundColor: AppColors.bg,

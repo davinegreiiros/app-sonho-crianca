@@ -35,8 +35,8 @@ Sem `spec.md` aprovado, sem código de feature. Bugfix simples e chore não prec
 | [009](009-notificacao-formato-aviso-previo/spec.md) | Notificação de tempo esgotado reformatada + aviso prévio de 5 min | Implemented | 005, 008 |
 | [010](010-migracao-arquitetura-camadas/spec.md) | Migração de arquitetura para camadas — fundação (spec guarda-chuva) | Implemented | — |
 | [011](011-migracao-configuracoes-negocio/spec.md) | Migração: Configurações do negócio (Repository + Cubit + View) | Implemented | 010 |
-| 012 | Migração: Catálogo (Repository + Cubit + Views) | Planned | 010, 011 |
+| [012](012-migracao-catalogo-criacao/spec.md) | Migração: Catálogo — criação de brinquedo (Repository + Cubit + View) | Implemented | 010, 011 |
 | 013 | Migração: Relatório | Planned | 010, 012 |
-| 014 | Migração: Locação (nova/ativa/encerrar) + PIX + notificações | Planned | 010, 012, 013 |
+| 014 | Migração: Locação (nova/ativa/encerrar) + PIX + notificações + grade do catálogo | Planned | 010, 012, 013 |
 
 Todas em `Draft` — cada uma tem "Dúvidas em aberto" que precisa de resposta sua antes de virar `Approved` e ganhar `plan.md`/`tasks.md`.

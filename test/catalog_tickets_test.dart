@@ -3,16 +3,19 @@
 // visible cap, and the required-category validation on "Novo brinquedo".
 
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:sonho_de_crianca/main.dart';
+import 'package:sonho_de_crianca/data/repositories/toy_repository.dart';
 import 'package:sonho_de_crianca/domain/models/toy.dart';
 import 'package:sonho_de_crianca/state/app_state.dart';
 import 'package:sonho_de_crianca/test_keys.dart';
 import 'package:sonho_de_crianca/theme/app_colors.dart';
-import 'package:sonho_de_crianca/widgets/add_toy_sheet.dart';
+import 'package:sonho_de_crianca/ui/features/catalog/view_models/toy_catalog_cubit.dart';
+import 'package:sonho_de_crianca/ui/features/catalog/views/add_toy_sheet_view.dart';
 
 /// Ticket widgets are private (`_TicketStub`) to `catalog_tab.dart`, so
 /// they're matched by runtime type name and their `free` field is read
@@ -111,10 +114,12 @@ void main() {
   });
 
   testWidgets('AddToySheet requires a category before it can be saved', (tester) async {
+    // AddToySheetView (spec 012) writes through ToyCatalogCubit, not
+    // AppState — no ChangeNotifierProvider<AppState> needed here anymore.
     await tester.pumpWidget(
-      ChangeNotifierProvider(
-        create: (_) => AppState(),
-        child: const MaterialApp(home: Scaffold(body: AddToySheet())),
+      BlocProvider(
+        create: (_) => ToyCatalogCubit(ToyRepository()),
+        child: const MaterialApp(home: Scaffold(body: AddToySheetView())),
       ),
     );
     await tester.pump();

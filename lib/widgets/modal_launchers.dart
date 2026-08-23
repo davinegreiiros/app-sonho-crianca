@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import '../state/app_state.dart';
 import '../theme/app_colors.dart';
 import '../ui/features/business_settings/views/business_settings_view.dart';
-import 'add_toy_sheet.dart';
+import '../ui/features/catalog/views/add_toy_sheet_view.dart';
 import 'end_rental_dialog.dart';
 import 'new_rental_sheet.dart';
 
@@ -61,7 +61,7 @@ Future<void> showAddToySheet(BuildContext context) {
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     barrierColor: AppColors.text.withValues(alpha: 0.5),
-    builder: (context) => const AddToySheet(),
+    builder: (context) => const AddToySheetView(),
   );
 }
 
