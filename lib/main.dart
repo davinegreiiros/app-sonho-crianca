@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:provider/provider.dart';
 
 import 'data/repositories/business_settings_repository.dart';
+import 'data/repositories/rental_repository.dart';
 import 'data/repositories/toy_repository.dart';
 import 'screens/home_shell.dart';
 import 'state/app_state.dart';
@@ -34,10 +35,18 @@ class SonhoDeCriancaApp extends StatelessWidget {
         ChangeNotifierProvider<ToyRepository>(
           create: (_) => ToyRepository(),
         ),
+        // No Cubit consumes this one yet (spec
+        // 013-migracao-rental-repository-fundacao is foundation-only) —
+        // still shared via provider so the fatias 014-016 Cubits can read
+        // the exact same instance AppState already does when they land.
+        ChangeNotifierProvider<RentalRepository>(
+          create: (_) => RentalRepository(),
+        ),
         ChangeNotifierProvider<AppState>(
           create: (context) => AppState(
             businessSettingsRepository: context.read<BusinessSettingsRepository>(),
             toyRepository: context.read<ToyRepository>(),
+            rentalRepository: context.read<RentalRepository>(),
           ),
         ),
       ],

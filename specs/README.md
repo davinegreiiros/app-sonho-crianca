@@ -36,7 +36,9 @@ Sem `spec.md` aprovado, sem código de feature. Bugfix simples e chore não prec
 | [010](010-migracao-arquitetura-camadas/spec.md) | Migração de arquitetura para camadas — fundação (spec guarda-chuva) | Implemented | — |
 | [011](011-migracao-configuracoes-negocio/spec.md) | Migração: Configurações do negócio (Repository + Cubit + View) | Implemented | 010 |
 | [012](012-migracao-catalogo-criacao/spec.md) | Migração: Catálogo — criação de brinquedo (Repository + Cubit + View) | Implemented | 010, 011 |
-| 013 | Migração: Relatório | Planned | 010, 012 |
-| 014 | Migração: Locação (nova/ativa/encerrar) + PIX + notificações + grade do catálogo | Planned | 010, 012, 013 |
+| [013](013-migracao-rental-repository-fundacao/spec.md) | Migração: `RentalRepository` — fundação | Implemented | 010, 012 |
+| 014 | Migração: Relatório | Planned | 013 |
+| 015 | Migração: Catálogo — grade do catálogo | Planned | 012, 013 |
+| 016 | Migração: Locação (nova/ativa/encerrar) + PIX + notificações | Planned | 013 |
 
 Todas em `Draft` — cada uma tem "Dúvidas em aberto" que precisa de resposta sua antes de virar `Approved` e ganhar `plan.md`/`tasks.md`.

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../data/repositories/business_settings_repository.dart';
+import '../data/repositories/rental_repository.dart';
 import '../data/repositories/toy_repository.dart';
 import '../domain/models/business_settings.dart';
 import '../domain/models/rental.dart';
@@ -55,16 +56,19 @@ class AppState extends ChangeNotifier {
     RentalNotifier? notifications,
     BusinessSettingsRepository? businessSettingsRepository,
     ToyRepository? toyRepository,
+    RentalRepository? rentalRepository,
   })  : notifications = notifications ?? LocalRentalNotifier(),
         _businessSettingsRepository = businessSettingsRepository ?? BusinessSettingsRepository(),
         _ownsBusinessSettingsRepository = businessSettingsRepository == null,
         _toyRepository = toyRepository ?? ToyRepository(),
-        _ownsToyRepository = toyRepository == null {
+        _ownsToyRepository = toyRepository == null,
+        _rentalRepository = rentalRepository ?? RentalRepository(),
+        _ownsRentalRepository = rentalRepository == null {
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) => notifyListeners());
     // BusinessSettings ownership moved to BusinessSettingsRepository (spec
     // 011-migracao-configuracoes-negocio) — AppState only relays its
     // changes so end_rental_dialog.dart/pix_qr_sheet.dart (not migrated
-    // yet, fatia 014) keep working unchanged off `businessSettings` below.
+    // yet, fatia 016) keep working unchanged off `businessSettings` below.
     _businessSettingsRepository.addListener(notifyListeners);
     _businessSettingsRepository.load();
     // Toy ownership moved to ToyRepository (spec
@@ -74,6 +78,12 @@ class AppState extends ChangeNotifier {
     // SharedPreferences involved), so `_seed()` below can rely on `toys`
     // already being populated.
     _toyRepository.addListener(notifyListeners);
+    // Rental ownership moved to RentalRepository (spec
+    // 013-migracao-rental-repository-fundacao) — same relay pattern.
+    // RentalRepository seeds itself synchronously, so `_seed()` below
+    // (which only sets up `draft` now) can rely on `rentals` already
+    // being populated.
+    _rentalRepository.addListener(notifyListeners);
     _seed();
     // Permission asked right at boot, not lazily on first rental (spec
     // 005 amendment, 2026-08-22, product owner decision) — fire-and-forget:
@@ -108,6 +118,13 @@ class AppState extends ChangeNotifier {
   final ToyRepository _toyRepository;
   final bool _ownsToyRepository;
 
+  /// Single source of truth for the rental list (spec
+  /// 013-migracao-rental-repository-fundacao) — foundation only, no Cubit
+  /// consumes it yet (that starts at fatia 014). Same opt-in pattern as
+  /// [_businessSettingsRepository]/[_toyRepository].
+  final RentalRepository _rentalRepository;
+  final bool _ownsRentalRepository;
+
   BusinessSettings get businessSettings => _businessSettingsRepository.settings;
 
   Future<void> updateBusinessSettings({
@@ -129,7 +146,7 @@ class AppState extends ChangeNotifier {
 
   AppTab tab = AppTab.home;
   List<Toy> get toys => _toyRepository.toys;
-  List<Rental> rentals = [];
+  List<Rental> get rentals => _rentalRepository.rentals;
 
   bool showNew = false;
   late RentalDraft draft;
@@ -155,33 +172,10 @@ class AppState extends ChangeNotifier {
   ReportPeriod reportPeriod = ReportPeriod.today;
 
   void _seed() {
-    // Toys are seeded by ToyRepository itself (spec
-    // 012-migracao-catalogo-criacao) — nothing to do here anymore.
-
-    DateTime minAgo(num n) => DateTime.now().subtract(Duration(seconds: (n * 60).round()));
-    DateTime dAgo(num n) => DateTime.now().subtract(Duration(seconds: (n * 86400).round()));
-    DateTime todayAt(int h) {
-      final now = DateTime.now();
-      final start = DateTime(now.year, now.month, now.day);
-      final at = start.add(Duration(hours: h));
-      final cap = now.subtract(const Duration(minutes: 5));
-      return at.isBefore(cap) ? at : cap;
-    }
-
-    rentals = [
-      Rental(id: 'a1', toyId: 'carrinho', childName: 'Sofia', guardianName: 'Camila Ramos', guardianPhone: '(85) 98888-1010', startedAt: minAgo(9), durationMin: 15, price: 10, status: RentalStatus.active),
-      Rental(id: 'a2', toyId: 'pula', childName: 'Enzo', guardianName: 'Marcos Lima', guardianPhone: '(85) 99999-2020', startedAt: minAgo(32), durationMin: 30, price: 12, status: RentalStatus.active),
-      Rental(id: 'a3', toyId: 'patinete', childName: 'Lívia', guardianName: 'Ana Souza', guardianPhone: '(85) 98777-3030', startedAt: minAgo(3), durationMin: 15, price: 12, status: RentalStatus.active),
-      Rental(id: 'h1', toyId: 'carrinho', childName: 'Davi', guardianName: 'Renata Alves', startedAt: todayAt(9).subtract(const Duration(minutes: 15)), durationMin: 15, price: 10, status: RentalStatus.done, endedAt: todayAt(9), paymentMethod: PaymentMethod.pix),
-      Rental(id: 'h2', toyId: 'cama', childName: 'Manuela', guardianName: 'Bruno Costa', startedAt: todayAt(10).subtract(const Duration(minutes: 30)), durationMin: 30, price: 15, status: RentalStatus.done, endedAt: todayAt(10), paymentMethod: PaymentMethod.dinheiro),
-      Rental(id: 'h3', toyId: 'piscina', childName: 'Théo', guardianName: 'Juliana Dias', startedAt: todayAt(11).subtract(const Duration(minutes: 20)), durationMin: 20, price: 10, status: RentalStatus.done, endedAt: todayAt(11), paymentMethod: PaymentMethod.cartao),
-      Rental(id: 'h4', toyId: 'pula', childName: 'Alice', guardianName: 'Paulo Nunes', startedAt: dAgo(1), durationMin: 30, price: 24, status: RentalStatus.done, endedAt: dAgo(1).add(const Duration(minutes: 30)), paymentMethod: PaymentMethod.pix),
-      Rental(id: 'h5', toyId: 'patinete', childName: 'Gabriel', guardianName: 'Carla Mota', startedAt: dAgo(1.2), durationMin: 15, price: 12, status: RentalStatus.done, endedAt: dAgo(1.2).add(const Duration(minutes: 15)), paymentMethod: PaymentMethod.dinheiro),
-      Rental(id: 'h6', toyId: 'carrinho', childName: 'Isabela', guardianName: 'Fábio Reis', startedAt: dAgo(2), durationMin: 15, price: 10, status: RentalStatus.done, endedAt: dAgo(2).add(const Duration(minutes: 15)), paymentMethod: PaymentMethod.cartao),
-      Rental(id: 'h7', toyId: 'cama', childName: 'Miguel', guardianName: 'Larissa Pinto', startedAt: dAgo(3.4), durationMin: 30, price: 15, status: RentalStatus.done, endedAt: dAgo(3.4).add(const Duration(minutes: 30)), paymentMethod: PaymentMethod.pix),
-      Rental(id: 'h8', toyId: 'piscina', childName: 'Helena', guardianName: 'Diego Farias', startedAt: dAgo(5.5), durationMin: 20, price: 10, status: RentalStatus.done, endedAt: dAgo(5.5).add(const Duration(minutes: 20)), paymentMethod: PaymentMethod.pix),
-    ];
-
+    // Toys are seeded by ToyRepository, rentals by RentalRepository
+    // (specs 012/013) — nothing to do here anymore beyond the draft,
+    // which depends on both being already populated (see the
+    // repository-listener setup above, run before this call).
     final first = toys.firstWhere((t) => toyAvailable(t) > 0, orElse: () => toys.first);
     draft = RentalDraft(toyId: first.id, durationMin: first.blockMin, price: first.price);
   }
@@ -193,6 +187,8 @@ class AppState extends ChangeNotifier {
     if (_ownsBusinessSettingsRepository) _businessSettingsRepository.dispose();
     _toyRepository.removeListener(notifyListeners);
     if (_ownsToyRepository) _toyRepository.dispose();
+    _rentalRepository.removeListener(notifyListeners);
+    if (_ownsRentalRepository) _rentalRepository.dispose();
     super.dispose();
   }
 
@@ -337,7 +333,7 @@ class AppState extends ChangeNotifier {
       // the field's doc on `Rental`).
       ratePerMinute: d.openEnded ? (d.customRatePerMinute ?? ratePerMinute(toyById(d.toyId))) : null,
     );
-    rentals.add(rental);
+    _rentalRepository.add(rental);
     _scheduleEndNotification(rental);
     showNew = false;
     notifyListeners();
@@ -394,8 +390,7 @@ class AppState extends ChangeNotifier {
   void cancelActive(String id) {
     notifications.cancelRentalEnd(id);
     notifications.cancelRentalEndingSoon(id);
-    rentals.removeWhere((r) => r.id == id);
-    notifyListeners();
+    _rentalRepository.removeById(id);
   }
 
   void openEnd(String id) {
