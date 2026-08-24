@@ -30,6 +30,31 @@ class _AddToySheetViewState extends State<AddToySheetView> {
   String _imageKey = kToyIconOptions.first.key;
   ToyCategory? _category;
 
+  /// Último nome sugerido automaticamente ao escolher um ícone (ver
+  /// [_selectIcon]) — usado só pra saber se o operador editou o campo à
+  /// mão depois da sugestão, pra não sobrescrever uma edição manual numa
+  /// troca de ícone seguinte.
+  String? _autoFilledName;
+
+  void _selectIcon(String key) {
+    setState(() {
+      _imageKey = key;
+      final option = kToyIconOptions.firstWhere((o) => o.key == key);
+      // Sugere o nome do ícone escolhido (editável depois) — exceto
+      // "Outro" (sem nome genérico pra sugerir) e exceto se o campo já
+      // tem um nome que o operador digitou por conta própria.
+      if (key == 'outro') {
+        _autoFilledName = null;
+      } else if (_nameCtrl.text.isEmpty || _nameCtrl.text == _autoFilledName) {
+        _nameCtrl.value = TextEditingValue(
+          text: option.label,
+          selection: TextSelection.collapsed(offset: option.label.length),
+        );
+        _autoFilledName = option.label;
+      }
+    });
+  }
+
   @override
   void dispose() {
     _nameCtrl.dispose();
@@ -100,7 +125,7 @@ class _AddToySheetViewState extends State<AddToySheetView> {
               const SizedBox(height: 6),
               _IconGrid(
                 selected: _imageKey,
-                onSelected: (key) => setState(() => _imageKey = key),
+                onSelected: _selectIcon,
               ),
               const SizedBox(height: 18),
               const _FieldLabel('Tipo'),
@@ -342,6 +367,7 @@ class _IconGridState extends State<_IconGrid> {
             final option = kToyIconOptions[i];
             final isSelected = option.key == widget.selected;
             return Pressable(
+              key: TestKeys.toyIconOption(option.key),
               child: GestureDetector(
                 onTap: () => widget.onSelected(option.key),
                 child: AnimatedContainer(

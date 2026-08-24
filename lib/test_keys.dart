@@ -30,6 +30,7 @@ class TestKeys {
   static ValueKey toyCardKey(String toyId) => ValueKey('toy_card_$toyId');
   static const addToySubmitButton = ValueKey('add_toy_submit_button');
   static ValueKey categoryOption(String category) => ValueKey('category_option_$category');
+  static ValueKey toyIconOption(String key) => ValueKey('toy_icon_option_$key');
 
   static const rentalModeFixed = ValueKey('rental_mode_fixed');
   static const rentalModeOpenEnded = ValueKey('rental_mode_open_ended');

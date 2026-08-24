@@ -138,4 +138,41 @@ void main() {
     final submitAfter = tester.widget<ElevatedButton>(find.byKey(TestKeys.addToySubmitButton));
     expect(submitAfter.onPressed, isNotNull);
   });
+
+  testWidgets('AddToySheet suggests the icon\'s label as the toy name, except for "Outro"', (tester) async {
+    await tester.pumpWidget(
+      BlocProvider(
+        create: (_) => ToyCatalogCubit(ToyRepository(), RentalRepository()),
+        child: const MaterialApp(home: Scaffold(body: AddToySheetView())),
+      ),
+    );
+    await tester.pump();
+
+    final nameField = find.byType(TextField).first;
+    final iconGrid = find.byType(GridView);
+
+    // Empty name field -> selecting an icon suggests its label. 'cama' is
+    // on the grid's first (visible without scrolling) page.
+    await tester.tap(find.byKey(TestKeys.toyIconOption('cama')));
+    await tester.pump();
+    expect(tester.widget<TextField>(nameField).controller!.text, 'Cama elástica');
+
+    // Editing the name by hand -> switching icons doesn't clobber it.
+    await tester.enterText(nameField, 'Nome Customizado');
+    await tester.pump();
+    await tester.tap(find.byKey(TestKeys.toyIconOption('pula')));
+    await tester.pump();
+    expect(tester.widget<TextField>(nameField).controller!.text, 'Nome Customizado');
+
+    // "Outro" never has a label to suggest — scrolled into view since it's
+    // the grid's last item (the icon grid has its own inner Scrollable,
+    // nested inside the sheet's outer one).
+    await tester.enterText(nameField, '');
+    await tester.pump();
+    final iconScrollable = find.descendant(of: iconGrid, matching: find.byType(Scrollable));
+    await tester.scrollUntilVisible(find.byKey(TestKeys.toyIconOption('outro')), 200, scrollable: iconScrollable);
+    await tester.tap(find.byKey(TestKeys.toyIconOption('outro')));
+    await tester.pump();
+    expect(tester.widget<TextField>(nameField).controller!.text, isEmpty);
+  });
 }
