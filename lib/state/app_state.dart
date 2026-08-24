@@ -457,27 +457,6 @@ class AppState extends ChangeNotifier {
 
   List<Rental> get activeRentals => rentals.where((r) => r.status == RentalStatus.active).toList();
 
-  DateTime get _startOfDay {
-    final now = DateTime.now();
-    return DateTime(now.year, now.month, now.day);
-  }
-
-  List<Rental> get doneAll => rentals.where((r) => r.status == RentalStatus.done).toList();
-
-  List<Rental> get doneToday => doneAll.where((r) => r.endedAt != null && !r.endedAt!.isBefore(_startOfDay)).toList();
-
-  double get homeTotalToday => doneToday.fold(0.0, (a, r) => a + r.price);
-
-  List<Rental> get recentActivity {
-    final combined = [...activeRentals, ...doneToday];
-    combined.sort((a, b) {
-      final ta = a.status == RentalStatus.active ? a.startedAt : a.endedAt!;
-      final tb = b.status == RentalStatus.active ? b.startedAt : b.endedAt!;
-      return tb.compareTo(ta);
-    });
-    return combined.take(4).toList();
-  }
-
   String get kicker {
     final dt = DateTime.now();
     String pad2(int n) => n.toString().padLeft(2, '0');

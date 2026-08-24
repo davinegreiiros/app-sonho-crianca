@@ -10,6 +10,7 @@ import 'state/app_state.dart';
 import 'theme/app_theme.dart';
 import 'ui/features/business_settings/view_models/business_settings_cubit.dart';
 import 'ui/features/catalog/view_models/toy_catalog_cubit.dart';
+import 'ui/features/home/view_models/home_cubit.dart';
 import 'ui/features/rental/view_models/active_rentals_cubit.dart';
 import 'ui/features/rental/view_models/new_rental_cubit.dart';
 import 'ui/features/report/view_models/report_cubit.dart';
@@ -67,6 +68,9 @@ class SonhoDeCriancaApp extends StatelessWidget {
               ),
               BlocProvider<ActiveRentalsCubit>(
                 create: (context) => ActiveRentalsCubit(context.read<ToyRepository>(), context.read<RentalRepository>()),
+              ),
+              BlocProvider<HomeCubit>(
+                create: (context) => HomeCubit(context.read<ToyRepository>(), context.read<RentalRepository>()),
               ),
             ],
             child: MaterialApp(

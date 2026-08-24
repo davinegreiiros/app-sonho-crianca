@@ -1,24 +1,28 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../domain/models/rental.dart';
-import '../../state/app_state.dart';
-import '../../test_keys.dart';
-import '../../theme/app_colors.dart';
-import '../../widgets/animations/cascade.dart';
-import '../../widgets/animations/confetti.dart';
-import '../../widgets/animations/pressable.dart';
-import '../../widgets/modal_launchers.dart';
-import '../../widgets/toy_icon.dart';
+import '../../../../domain/formatters.dart';
+import '../../../../domain/models/rental.dart';
+import '../../../../test_keys.dart';
+import '../../../../theme/app_colors.dart';
+import '../../../../widgets/animations/cascade.dart';
+import '../../../../widgets/animations/confetti.dart';
+import '../../../../widgets/animations/pressable.dart';
+import '../../../../widgets/modal_launchers.dart';
+import '../../../../widgets/toy_icon.dart';
+import '../view_models/home_cubit.dart';
+import '../view_models/home_state.dart';
 
-class HomeTab extends StatefulWidget {
-  const HomeTab({super.key});
+/// Migrated in spec 019-migracao-painel-home: reads through [HomeCubit]
+/// instead of `AppState` — the last screen to migrate off it.
+class HomeView extends StatefulWidget {
+  const HomeView({super.key});
 
   @override
-  State<HomeTab> createState() => _HomeTabState();
+  State<HomeView> createState() => _HomeViewState();
 }
 
-class _HomeTabState extends State<HomeTab> with TickerProviderStateMixin {
+class _HomeViewState extends State<HomeView> with TickerProviderStateMixin {
   CascadeController? _cascade;
   int _lastItemCount = -1;
 
@@ -43,14 +47,14 @@ class _HomeTabState extends State<HomeTab> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
-    final recent = state.recentActivity;
+    final home = context.watch<HomeCubit>().state;
+    final recent = home.recentActivity;
     final cascade = _cascadeFor(recent.length);
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 6, 20, 100),
       children: [
-        cascade.item(0, child: _TotalTodayCard(state: state)),
+        cascade.item(0, child: _TotalTodayCard(home: home)),
         const SizedBox(height: 20),
         cascade.item(
           1,
@@ -62,7 +66,7 @@ class _HomeTabState extends State<HomeTab> with TickerProviderStateMixin {
                   labelColor: AppColors.accent2_700,
                   valueColor: AppColors.accent2_900,
                   label: 'Agora',
-                  value: '${state.activeRentals.length}',
+                  value: '${home.activeCount}',
                   caption: 'em uso na praça',
                 ),
               ),
@@ -73,7 +77,7 @@ class _HomeTabState extends State<HomeTab> with TickerProviderStateMixin {
                   labelColor: AppColors.yellowFg,
                   valueColor: AppColors.yellowFgDark,
                   label: 'Disponíveis',
-                  value: '${state.toys.fold<int>(0, (a, t) => a + state.toyAvailable(t))}',
+                  value: '${home.availableCount}',
                   caption: 'prontas pra locar',
                 ),
               ),
@@ -131,7 +135,7 @@ class _HomeTabState extends State<HomeTab> with TickerProviderStateMixin {
                   )
                 else
                   for (var i = 0; i < recent.length; i++)
-                    cascade.item(3 + i, child: _ActivityRow(state: state, rental: recent[i])),
+                    cascade.item(3 + i, child: _ActivityRow(home: home, rental: recent[i])),
               ],
             ),
           ),
@@ -142,12 +146,12 @@ class _HomeTabState extends State<HomeTab> with TickerProviderStateMixin {
 }
 
 class _TotalTodayCard extends StatelessWidget {
-  const _TotalTodayCard({required this.state});
-  final AppState state;
+  const _TotalTodayCard({required this.home});
+  final HomeState home;
 
   @override
   Widget build(BuildContext context) {
-    final count = state.doneToday.length;
+    final count = home.doneTodayCount;
     return ClipRRect(
       borderRadius: BorderRadius.circular(4),
       child: Container(
@@ -184,7 +188,7 @@ class _TotalTodayCard extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  state.fmtMoney(state.homeTotalToday),
+                  formatMoney(home.homeTotalToday),
                   style: const TextStyle(
                     fontSize: 44,
                     fontWeight: FontWeight.w600,
@@ -247,13 +251,13 @@ class _StatCard extends StatelessWidget {
 }
 
 class _ActivityRow extends StatelessWidget {
-  const _ActivityRow({required this.state, required this.rental});
-  final AppState state;
+  const _ActivityRow({required this.home, required this.rental});
+  final HomeState home;
   final Rental rental;
 
   @override
   Widget build(BuildContext context) {
-    final toy = state.toyById(rental.toyId);
+    final toy = home.toyById(rental.toyId);
     final active = rental.status == RentalStatus.active;
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10),
@@ -279,14 +283,14 @@ class _ActivityRow extends StatelessWidget {
                   style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                 ),
                 Text(
-                  active ? 'em andamento' : state.whenLabel(rental.endedAt!),
+                  active ? 'em andamento' : formatRelativeTime(rental.endedAt!),
                   style: TextStyle(fontSize: 12, color: AppColors.text.withValues(alpha: 0.6)),
                 ),
               ],
             ),
           ),
           Text(
-            state.fmtMoney(rental.price),
+            formatMoney(rental.price),
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
