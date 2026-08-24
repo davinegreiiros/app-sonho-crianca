@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../data/repositories/toy_repository.dart';
 import '../theme/app_colors.dart';
 import '../ui/features/business_settings/views/business_settings_view.dart';
 import '../ui/features/catalog/views/add_toy_sheet_view.dart';
@@ -14,7 +15,23 @@ import '../ui/features/rental/views/new_rental_sheet_view.dart';
 /// backdrop. [NewRentalCubit.open] resets the form's own draft (spec
 /// 017-migracao-nova-locacao — independent from `AppState.draft`, see
 /// `NewRentalState`'s doc for why).
+///
+/// Guards on an empty catalog first: [NewRentalCubit.open] always picks
+/// *some* toy for the draft (needs one to compute duration/price), which
+/// has no sane answer with zero toys — bail out with a message instead of
+/// letting that pick blow up.
 Future<void> showNewRentalSheet(BuildContext context) async {
+  if (context.read<ToyRepository>().toys.isEmpty) {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      const SnackBar(
+        content: Text('Cadastre um brinquedo no catálogo antes de registrar uma locação.'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+    return;
+  }
   context.read<NewRentalCubit>().open();
   await showModalBottomSheet<void>(
     context: context,
