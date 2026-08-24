@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../state/app_state.dart';
 import '../theme/app_colors.dart';
 import '../ui/features/business_settings/views/business_settings_view.dart';
 import '../ui/features/catalog/views/add_toy_sheet_view.dart';
+import '../ui/features/rental/view_models/active_rentals_cubit.dart';
 import '../ui/features/rental/view_models/new_rental_cubit.dart';
+import '../ui/features/rental/views/end_rental_dialog_view.dart';
 import '../ui/features/rental/views/new_rental_sheet_view.dart';
-import 'end_rental_dialog.dart';
 
 /// Opens the "Nova locação" form as a real modal bottom sheet — slides up
 /// from the bottom with the framework's own transition, dims the
@@ -29,8 +29,8 @@ Future<void> showNewRentalSheet(BuildContext context) async {
 /// with an elastic overshoot ([Curves.easeOutBack]) over a fading
 /// backdrop.
 Future<void> showEndRentalDialog(BuildContext context, String rentalId) async {
-  final state = context.read<AppState>();
-  state.openEnd(rentalId);
+  final cubit = context.read<ActiveRentalsCubit>();
+  cubit.openEnd(rentalId);
   await showGeneralDialog<void>(
     context: context,
     barrierDismissible: true,
@@ -38,7 +38,7 @@ Future<void> showEndRentalDialog(BuildContext context, String rentalId) async {
     barrierColor: AppColors.overlayScrim.withValues(alpha: 0.5),
     transitionDuration: const Duration(milliseconds: 260),
     pageBuilder: (context, animation, secondaryAnimation) =>
-        const EndRentalDialog(),
+        const EndRentalDialogView(),
     transitionBuilder: (context, animation, _, child) {
       final scale = CurvedAnimation(
         parent: animation,
@@ -50,7 +50,7 @@ Future<void> showEndRentalDialog(BuildContext context, String rentalId) async {
       );
     },
   );
-  state.closeEnd();
+  cubit.closeEnd();
 }
 
 /// Opens the "Adicionar brinquedo" form as a modal bottom sheet.

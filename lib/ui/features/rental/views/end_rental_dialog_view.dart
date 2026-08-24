@@ -1,40 +1,41 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../domain/models/rental.dart';
-import '../state/app_state.dart';
-import '../test_keys.dart';
-import '../theme/app_colors.dart';
-import 'animations/pressable.dart';
-import 'modal_launchers.dart';
-import 'pix_qr_sheet.dart';
+import '../../../../domain/formatters.dart';
+import '../../../../domain/models/rental.dart';
+import '../../../../test_keys.dart';
+import '../../../../theme/app_colors.dart';
+import '../../../../widgets/animations/pressable.dart';
+import '../../../../widgets/modal_launchers.dart';
+import '../../business_settings/view_models/business_settings_cubit.dart';
+import '../view_models/active_rentals_cubit.dart';
+import 'pix_qr_sheet_view.dart';
 
 /// "Finalizar locação" confirmation card: picks a payment method, then
 /// commits the rental as done. Layout ported 1:1 from the design source's
 /// `showEnd` overlay (title/summary/payment-row/button-row, gap 14).
-class EndRentalDialog extends StatelessWidget {
-  const EndRentalDialog({super.key});
+///
+/// Migrated in spec 018-migracao-locacao-ativa-encerrar: reads/writes
+/// through [ActiveRentalsCubit] instead of `AppState`; the "Pix without
+/// settings configured" check reads [BusinessSettingsCubit] instead of
+/// `AppState.businessSettings`.
+class EndRentalDialogView extends StatelessWidget {
+  const EndRentalDialogView({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
+    final cubit = context.watch<ActiveRentalsCubit>();
     // `endingId` can already be null here: `confirmEnd()`/`closeEnd()` fire
     // notifyListeners() (rebuilding this widget) before Navigator.pop()
     // finishes unmounting it. Render nothing rather than crash in that gap.
-    Rental? rental;
-    for (final r in state.rentals) {
-      if (r.id == state.endingId) {
-        rental = r;
-        break;
-      }
-    }
+    final rental = cubit.state.endingRental;
     if (rental == null) return const SizedBox.shrink();
-    if (state.endShowPixQr) return PixQrSheet(rentalId: rental.id);
-    final toy = state.toyById(rental.toyId);
-    final finalPrice = state.computeFinalPrice(rental);
+    if (cubit.state.endShowPixQr) return PixQrSheetView(rentalId: rental.id);
+    final toy = cubit.toyById(rental.toyId);
+    final finalPrice = cubit.computeFinalPrice(rental);
     final summary =
-        '${toy.name} · ${rental.childName} · ${state.fmtMoney(finalPrice)}';
-    final canConfirm = state.endPayment != null;
+        '${toy.name} · ${rental.childName} · ${formatMoney(finalPrice)}';
+    final canConfirm = cubit.state.endPayment != null;
 
     // `showGeneralDialog` (unlike `showModalBottomSheet`) doesn't wrap its
     // content in a `Material` ancestor — without one, plain `Text` here
@@ -96,8 +97,8 @@ class EndRentalDialog extends StatelessWidget {
                           child: _PaymentOption(
                             key: TestKeys.paymentOption(m.name),
                             label: m.label,
-                            selected: state.endPayment == m,
-                            onTap: () => state.selectPayment(m),
+                            selected: cubit.state.endPayment == m,
+                            onTap: () => cubit.selectPayment(m),
                           ),
                         ),
                       ),
@@ -111,7 +112,7 @@ class EndRentalDialog extends StatelessWidget {
                       child: Pressable(
                         child: OutlinedButton(
                           onPressed: () {
-                            state.closeEnd();
+                            cubit.closeEnd();
                             Navigator.of(context).pop();
                           },
                           style: OutlinedButton.styleFrom(
@@ -148,9 +149,10 @@ class EndRentalDialog extends StatelessWidget {
                                     // committing — same dialog route, so it never
                                     // races with `closeEnd()` resetting the ids
                                     // this needs once the QR step confirms.
-                                    if (state.endPayment == PaymentMethod.pix) {
-                                      if (!state.businessSettings.isConfigured) {
-                                        state.closeEnd();
+                                    if (cubit.state.endPayment == PaymentMethod.pix) {
+                                      final settings = context.read<BusinessSettingsCubit>().state.settings;
+                                      if (!settings.isConfigured) {
+                                        cubit.closeEnd();
                                         Navigator.of(context).pop();
                                         openBusinessSettingsScreen(
                                           context,
@@ -158,10 +160,10 @@ class EndRentalDialog extends StatelessWidget {
                                         );
                                         return;
                                       }
-                                      state.showPixQrStep();
+                                      cubit.showPixQrStep();
                                       return;
                                     }
-                                    state.confirmEnd();
+                                    cubit.confirmEnd();
                                     Navigator.of(context).pop();
                                   }
                                 : null,

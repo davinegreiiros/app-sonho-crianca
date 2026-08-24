@@ -100,8 +100,10 @@ void main() {
       price: rental.price,
       status: RentalStatus.active,
     );
-    state.setTab(state.tab); // notifyListeners via a harmless no-op state change
-    await tester.pump(const Duration(milliseconds: 400));
+    // ActiveTabView (spec 018) rebuilds off ActiveRentalsCubit's own 1s
+    // ticker, not AppState's notifyListeners — pump past that instead of
+    // the old "state.setTab(state.tab)" no-op-notify trick.
+    await tester.pump(const Duration(milliseconds: 1100));
 
     expect(alarmLabel, findsOneWidget);
     // Clock freezes at 00:00 instead of counting up past the duration.

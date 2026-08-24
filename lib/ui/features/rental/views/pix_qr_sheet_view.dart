@@ -1,49 +1,55 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
-import '../data/services/pix_payload.dart';
-import '../state/app_state.dart';
-import '../test_keys.dart';
-import '../theme/app_colors.dart';
-import 'animations/pressable.dart';
-import 'animations/print_strip.dart';
-import 'animations/pulse.dart';
+import '../../../../data/services/pix_payload.dart';
+import '../../../../domain/formatters.dart';
+import '../../../../test_keys.dart';
+import '../../../../theme/app_colors.dart';
+import '../../../../widgets/animations/pressable.dart';
+import '../../../../widgets/animations/print_strip.dart';
+import '../../../../widgets/animations/pulse.dart';
+import '../../business_settings/view_models/business_settings_cubit.dart';
+import '../view_models/active_rentals_cubit.dart';
 
 /// Shows the Pix QR (+ "copia e cola" text) for a rental's final price,
 /// then lets the operator confirm the payment landed — same commit as
-/// today's "Confirmar" (`AppState.confirmEnd`), just with the QR shown
-/// first (spec 004-pix-qrcode). Redressed as a cash-register "cupom"
-/// (CMY ink stripe, perforated-edge trim, doc number) in spec
+/// today's "Confirmar" (`ActiveRentalsCubit.confirmEnd`), just with the QR
+/// shown first (spec 004-pix-qrcode). Redressed as a cash-register
+/// "cupom" (CMY ink stripe, perforated-edge trim, doc number) in spec
 /// 007-revisao-design-v3, artboard 1c — same outer container shape as
 /// before (`Material > Center > Padding > Container > Column`), only the
 /// content inside changed, so the pop-in transition's layout stays as
 /// proven-stable as the rest of the app's dialogs. The "copiar" and
 /// "trocar forma"/"concluir" buttons keep the exact `Row`/`Expanded`/
 /// `Pressable` shapes already proven stable elsewhere in this file and in
-/// `EndRentalDialog` — a `CrossAxisAlignment.stretch` Row around a fixed-
-/// height `Pressable(ElevatedButton)` was tried here and made
+/// `EndRentalDialogView` — a `CrossAxisAlignment.stretch` Row around a
+/// fixed-height `Pressable(ElevatedButton)` was tried here and made
 /// `WidgetTester.tap` intermittently hit-test a not-yet-laid-out
 /// `RenderBox` (`flutter test` "Cannot hit test a render box with no
 /// size"); don't reintroduce that combination.
-class PixQrSheet extends StatelessWidget {
-  const PixQrSheet({super.key, required this.rentalId});
+///
+/// Migrated in spec 018-migracao-locacao-ativa-encerrar: reads/writes
+/// through [ActiveRentalsCubit]/[BusinessSettingsCubit] instead of
+/// `AppState`.
+class PixQrSheetView extends StatelessWidget {
+  const PixQrSheetView({super.key, required this.rentalId});
   final String rentalId;
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
-    final rental = state.rentals.where((r) => r.id == rentalId).firstOrNull;
+    final cubit = context.watch<ActiveRentalsCubit>();
+    final rental = cubit.state.activeRentals.where((r) => r.id == rentalId).firstOrNull;
     if (rental == null) return const SizedBox.shrink();
 
     // `showPixQrStep()` already froze this the instant the QR step opened
     // (spec 004/006 fix: a tempo-corrido price keeps climbing every
     // second the QR is on screen) — reuse that exact value here so the
     // QR always encodes the same amount `confirmEnd()` ends up charging.
-    final amount = state.endFrozenPrice ?? state.computeFinalPrice(rental);
-    final settings = state.businessSettings;
-    final toy = state.toyById(rental.toyId);
+    final amount = cubit.state.endFrozenPrice ?? cubit.computeFinalPrice(rental);
+    final settings = context.watch<BusinessSettingsCubit>().state.settings;
+    final toy = cubit.toyById(rental.toyId);
     final doc = _sanitizedDoc(rental.id);
     final payload = buildPixPayload(
       merchantName: settings.merchantName,
@@ -53,7 +59,7 @@ class PixQrSheet extends StatelessWidget {
       txid: doc,
     );
 
-    // Same reasoning as `EndRentalDialog`: this can be shown through a
+    // Same reasoning as `EndRentalDialogView`: this can be shown through a
     // route (`showGeneralDialog`) with no `Material` ancestor of its own,
     // so it needs one to avoid the plain-`Text` fallback-style bug fixed
     // in specs/001-tema-layout-parity.
@@ -96,7 +102,7 @@ class PixQrSheet extends StatelessWidget {
                   style: TextStyle(fontSize: 12.5, color: AppColors.text.withValues(alpha: 0.7)),
                 ),
                 Text(
-                  state.fmtMoney(amount),
+                  formatMoney(amount),
                   style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w700, height: 1.05),
                 ),
                 const SizedBox(height: 16),
@@ -209,7 +215,7 @@ class PixQrSheet extends StatelessWidget {
                       child: Pressable(
                         child: OutlinedButton(
                           key: TestKeys.pixTrocarFormaButton,
-                          onPressed: () => state.hidePixQrStep(),
+                          onPressed: () => cubit.hidePixQrStep(),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: AppColors.text,
                             side: BorderSide(color: AppColors.text.withValues(alpha: 0.16)),
@@ -229,13 +235,14 @@ class PixQrSheet extends StatelessWidget {
                           key: TestKeys.pixQrDoneButton,
                           onPressed: () {
                             // `confirmEnd()` nulls `endingId` and notifies
-                            // synchronously — `EndRentalDialog` (this sheet's
-                            // parent) rebuilds right then and swaps this widget
-                            // out, so `context` is a deactivated element by the
-                            // time control returns here. Grab the `Navigator`
-                            // first, while `context` is still good.
+                            // synchronously — `EndRentalDialogView` (this
+                            // sheet's parent) rebuilds right then and swaps
+                            // this widget out, so `context` is a deactivated
+                            // element by the time control returns here. Grab
+                            // the `Navigator` first, while `context` is still
+                            // good.
                             final navigator = Navigator.of(context);
-                            state.confirmEnd();
+                            cubit.confirmEnd();
                             navigator.pop();
                           },
                           style: ElevatedButton.styleFrom(

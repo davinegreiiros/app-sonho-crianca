@@ -96,4 +96,31 @@ class RentalRepository extends ChangeNotifier {
     rentals.removeWhere((r) => r.id == id);
     notifyListeners();
   }
+
+  /// Adds `addMinutes`-worth of duration/price to an active fixed-duration
+  /// rental (the caller computes the new values — the rate/minute formula
+  /// needs `Toy` data this repository deliberately doesn't have) and
+  /// notifies. Spec 018-migracao-locacao-ativa-encerrar: before this,
+  /// `AppState.extendActive` mutated the `Rental` in place without ever
+  /// calling this repository's `notifyListeners()`, so `ReportCubit`/
+  /// `ToyCatalogCubit` (which only listen here) never found out a rental
+  /// had been extended — this method is the fix, used by both worlds.
+  void extend(String rentalId, {required int durationMin, required double price}) {
+    final r = rentals.firstWhere((r) => r.id == rentalId, orElse: () => rentals.first);
+    r.durationMin = durationMin;
+    r.price = price;
+    notifyListeners();
+  }
+
+  /// Marks a rental done and notifies — same "AppState mutated without
+  /// notifying this repository" gap [extend] fixes, now for `confirmEnd`.
+  /// [finalPrice] is only passed for an open-ended rental (the caller —
+  /// `AppState`/`ActiveRentalsCubit` — decides; a fixed-duration rental's
+  /// price never changes at finish time).
+  void finish(String rentalId, PaymentMethod method, {double? finalPrice}) {
+    final r = rentals.firstWhere((r) => r.id == rentalId, orElse: () => rentals.first);
+    if (finalPrice != null) r.price = finalPrice;
+    r.finish(method);
+    notifyListeners();
+  }
 }

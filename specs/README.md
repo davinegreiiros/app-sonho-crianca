@@ -41,6 +41,7 @@ Sem `spec.md` aprovado, sem código de feature. Bugfix simples e chore não prec
 | [015](015-migracao-catalogo-grade/spec.md) | Migração: Catálogo — grade e tickets de disponibilidade | Implemented | 012, 013 |
 | [016](016-migracao-servicos-locacao-fundacao/spec.md) | Migração: Serviços de locação — fundação (Pix payload + notificações) | Implemented | 013 |
 | [017](017-migracao-nova-locacao/spec.md) | Migração: Nova locação (formulário) | Implemented | 016 |
-| 018+ | Migração: Locação — ativa/estender/cancelar/encerrar + PIX, sub-fatiada | Planned | 017 |
+| [018](018-migracao-locacao-ativa-encerrar/spec.md) | Migração: Locação ativa, estender, cancelar, encerrar + Pix | Implemented | 017 |
+| 019 | Migração: Painel do dia (Home) | Planned | 018 |
 
 Todas em `Draft` — cada uma tem "Dúvidas em aberto" que precisa de resposta sua antes de virar `Approved` e ganhar `plan.md`/`tasks.md`.

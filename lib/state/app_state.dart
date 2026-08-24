@@ -136,10 +136,6 @@ class AppState extends ChangeNotifier {
     );
   }
 
-  // ---- config (design-time props in the original, fixed defaults here) ----
-  static const Color _alertColor = AppColors.statusUrgent;
-  static const bool _pulseOnOvertime = true;
-
   late final Timer _ticker;
 
   AppTab tab = AppTab.home;
@@ -194,20 +190,6 @@ class AppState extends ChangeNotifier {
 
   String fmtMoney(double v) => formatMoney(v);
 
-  Color statusColor(double ratio, bool overtime) {
-    if (overtime || ratio <= 0.2) return _alertColor;
-    if (ratio <= 0.5) return AppColors.statusWarn;
-    return AppColors.statusOk;
-  }
-
-  String fmtClock(double remainMin) {
-    final overtime = remainMin < 0;
-    final abs = remainMin.abs();
-    final mm = abs.floor();
-    final ss = ((abs - mm) * 60).round();
-    String pad(int n) => n.toString().padLeft(2, '0');
-    return '${overtime ? '+' : ''}${pad(mm)}:${pad(ss)}';
-  }
 
   String whenLabel(DateTime ts) => formatRelativeTime(ts);
 
@@ -349,13 +331,17 @@ class AppState extends ChangeNotifier {
   void extendActive(String rentalId, int addMinutes) {
     final r = rentals.firstWhere((r) => r.id == rentalId, orElse: () => rentals.first);
     if (r.isOpenEnded) return;
-    r.durationMin = r.durationMin! + addMinutes;
     final rate = r.ratePerMinute ?? ratePerMinute(toyById(r.toyId));
-    r.price = ((r.price + rate * addMinutes) * 100).round() / 100;
+    final newDuration = r.durationMin! + addMinutes;
+    final newPrice = ((r.price + rate * addMinutes) * 100).round() / 100;
+    // RentalRepository.extend mutates + notifies (spec
+    // 018-migracao-locacao-ativa-encerrar) — before this, mutating `r`
+    // directly here never told RentalRepository's other listeners
+    // (ReportCubit/ToyCatalogCubit) that anything changed.
+    _rentalRepository.extend(rentalId, durationMin: newDuration, price: newPrice);
     notifications.cancelRentalEnd(r.id);
     notifications.cancelRentalEndingSoon(r.id);
     _scheduleEndNotification(r);
-    notifyListeners();
   }
 
   void cancelActive(String id) {
@@ -417,8 +403,13 @@ class AppState extends ChangeNotifier {
     // one — never recompute a tempo-corrido price after the QR was
     // already shown, or the amount charged could exceed what the
     // customer's bank app actually scanned.
-    if (r.isOpenEnded) r.price = endFrozenPrice ?? computeFinalPrice(r);
-    r.finish(endPayment!);
+    // RentalRepository.finish mutates + notifies (spec
+    // 018-migracao-locacao-ativa-encerrar — same fix as extendActive).
+    _rentalRepository.finish(
+      r.id,
+      endPayment!,
+      finalPrice: r.isOpenEnded ? (endFrozenPrice ?? computeFinalPrice(r)) : null,
+    );
     endingId = null;
     endPayment = null;
     endFrozenPrice = null;
@@ -499,6 +490,4 @@ class AppState extends ChangeNotifier {
         AppTab.catalog => 'Brinquedos',
         AppTab.report => 'Faturamento',
       };
-
-  bool get pulseOnOvertime => _pulseOnOvertime;
 }

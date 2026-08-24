@@ -1,26 +1,29 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../domain/models/rental.dart';
-import '../../state/app_state.dart';
-import '../../test_keys.dart';
-import '../../theme/app_colors.dart';
-import '../../widgets/animations/cascade.dart';
-import '../../widgets/animations/endless_rail.dart';
-import '../../widgets/animations/pressable.dart';
-import '../../widgets/animations/pulse.dart';
-import '../../widgets/animations/striped_progress.dart';
-import '../../widgets/modal_launchers.dart';
-import '../../widgets/toy_icon.dart';
+import '../../../../domain/formatters.dart';
+import '../../../../domain/models/rental.dart';
+import '../../../../test_keys.dart';
+import '../../../../theme/app_colors.dart';
+import '../../../../widgets/animations/cascade.dart';
+import '../../../../widgets/animations/endless_rail.dart';
+import '../../../../widgets/animations/pressable.dart';
+import '../../../../widgets/animations/pulse.dart';
+import '../../../../widgets/animations/striped_progress.dart';
+import '../../../../widgets/modal_launchers.dart';
+import '../../../../widgets/toy_icon.dart';
+import '../view_models/active_rentals_cubit.dart';
 
-class ActiveTab extends StatefulWidget {
-  const ActiveTab({super.key});
+/// Migrated in spec 018-migracao-locacao-ativa-encerrar: reads/writes
+/// through [ActiveRentalsCubit] instead of `AppState`.
+class ActiveTabView extends StatefulWidget {
+  const ActiveTabView({super.key});
 
   @override
-  State<ActiveTab> createState() => _ActiveTabState();
+  State<ActiveTabView> createState() => _ActiveTabViewState();
 }
 
-class _ActiveTabState extends State<ActiveTab> with TickerProviderStateMixin {
+class _ActiveTabViewState extends State<ActiveTabView> with TickerProviderStateMixin {
   CascadeController? _cascade;
   int _lastCount = -1;
 
@@ -41,8 +44,8 @@ class _ActiveTabState extends State<ActiveTab> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
-    final rentals = state.activeRentals;
+    final cubit = context.watch<ActiveRentalsCubit>();
+    final rentals = cubit.state.activeRentals;
 
     if (rentals.isEmpty) {
       return Center(
@@ -66,20 +69,44 @@ class _ActiveTabState extends State<ActiveTab> with TickerProviderStateMixin {
       padding: const EdgeInsets.fromLTRB(20, 6, 20, 110),
       itemCount: rentals.length,
       separatorBuilder: (context, index) => const SizedBox(height: 14),
-      itemBuilder: (context, i) => cascade.item(i, child: _ActiveCard(state: state, rental: rentals[i])),
+      itemBuilder: (context, i) => cascade.item(i, child: _ActiveCard(cubit: cubit, rental: rentals[i])),
     );
   }
 }
+
+/// Overtime uses the alert color regardless of ratio; otherwise a
+/// green/amber/red gradient by how much time is left — ported unchanged
+/// from `AppState.statusColor` (only this screen ever called it).
+Color _statusColor(double ratio, bool overtime) {
+  if (overtime || ratio <= 0.2) return AppColors.statusUrgent;
+  if (ratio <= 0.5) return AppColors.statusWarn;
+  return AppColors.statusOk;
+}
+
+/// `+MM:SS`/`MM:SS` countdown label, ported unchanged from
+/// `AppState.fmtClock` (only this screen ever called it).
+String _fmtClock(double remainMin) {
+  final overtime = remainMin < 0;
+  final abs = remainMin.abs();
+  final mm = abs.floor();
+  final ss = ((abs - mm) * 60).round();
+  String pad(int n) => n.toString().padLeft(2, '0');
+  return '${overtime ? '+' : ''}${pad(mm)}:${pad(ss)}';
+}
+
+/// Always on — was a fixed `AppState._pulseOnOvertime` design-time flag,
+/// never toggled; kept as a named constant here for the same readability
+/// it gave `StripedProgress(..., pulse: overtime && _pulseOnOvertime)`.
+const _pulseOnOvertime = true;
 
 /// "Estimado agora" block for a tempo-corrido card: the running total in
 /// large type plus elapsed minutes and a reminder that the final charge
 /// only locks in when the operator taps "Parar e cobrar" (design source:
 /// `specs/007-revisao-design-v3`, artboard 1e).
 class _EstimateNow extends StatelessWidget {
-  const _EstimateNow({required this.value, required this.elapsedMin, required this.fmtMoney});
+  const _EstimateNow({required this.value, required this.elapsedMin});
   final double value;
   final double elapsedMin;
-  final String Function(double) fmtMoney;
 
   @override
   Widget build(BuildContext context) {
@@ -101,7 +128,7 @@ class _EstimateNow extends StatelessWidget {
                     color: AppColors.text.withValues(alpha: 0.55),
                   ),
                 ),
-                Text(fmtMoney(value), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600, height: 1.1)),
+                Text(formatMoney(value), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600, height: 1.1)),
               ],
             ),
           ),
@@ -167,12 +194,12 @@ class _CanhotoBadge extends StatelessWidget {
 }
 
 /// "+ tempo" chip row for a fixed-duration active rental (spec 008):
-/// 5/10/15 min presets, each calling [AppState.extendActive]. Never shown
-/// for "tempo corrido" (spec 006) rentals, which have no duration to
-/// extend.
+/// 5/10/15 min presets, each calling [ActiveRentalsCubit.extendActive].
+/// Never shown for "tempo corrido" (spec 006) rentals, which have no
+/// duration to extend.
 class _ExtendTimeRow extends StatelessWidget {
-  const _ExtendTimeRow({required this.state, required this.rentalId, required this.fg});
-  final AppState state;
+  const _ExtendTimeRow({required this.cubit, required this.rentalId, required this.fg});
+  final ActiveRentalsCubit cubit;
   final String rentalId;
   final Color fg;
 
@@ -190,7 +217,7 @@ class _ExtendTimeRow extends StatelessWidget {
           Pressable(
             child: OutlinedButton(
               key: TestKeys.extendRentalButton(rentalId, m),
-              onPressed: () => state.extendActive(rentalId, m),
+              onPressed: () => cubit.extendActive(rentalId, m),
               style: OutlinedButton.styleFrom(
                 foregroundColor: fg,
                 side: BorderSide(color: fg.withValues(alpha: 0.25)),
@@ -220,13 +247,13 @@ String _fmtElapsed(double elapsedMin) {
 }
 
 class _ActiveCard extends StatelessWidget {
-  const _ActiveCard({required this.state, required this.rental});
-  final AppState state;
+  const _ActiveCard({required this.cubit, required this.rental});
+  final ActiveRentalsCubit cubit;
   final Rental rental;
 
   @override
   Widget build(BuildContext context) {
-    final toy = state.toyById(rental.toyId);
+    final toy = cubit.toyById(rental.toyId);
     final elapsedMin = DateTime.now().difference(rental.startedAt).inMilliseconds / 60000;
 
     // "Tempo corrido" (spec 006) has no fixed duration, so none of the
@@ -239,10 +266,10 @@ class _ActiveCard extends StatelessWidget {
     // Tempo corrido (spec 006) reads in magenta, not the fixed rental's
     // green/amber/red status colors — it never has an "urgency" state to
     // signal (design source, artboard 1e).
-    final color = openEnded ? AppColors.accent2_700 : state.statusColor(remainMin / duration!, overtime);
+    final color = openEnded ? AppColors.accent2_700 : _statusColor(remainMin / duration!, overtime);
     final progress = openEnded ? 0.0 : (elapsedMin / duration!).clamp(0.0, 1.0);
-    final liveValue = openEnded ? state.computeFinalPrice(rental) : rental.price;
-    final rate = openEnded ? (rental.ratePerMinute ?? state.ratePerMinute(toy)) : 0.0;
+    final liveValue = openEnded ? cubit.computeFinalPrice(rental) : rental.price;
+    final rate = openEnded ? (rental.ratePerMinute ?? cubit.ratePerMinute(toy)) : 0.0;
 
     return Container(
       key: TestKeys.activeCardKey(rental.id),
@@ -320,7 +347,7 @@ class _ActiveCard extends StatelessWidget {
                         const SizedBox(width: 2),
                       ],
                       Text(
-                        openEnded ? _fmtElapsed(elapsedMin) : state.fmtClock(overtime ? 0.0 : remainMin),
+                        openEnded ? _fmtElapsed(elapsedMin) : _fmtClock(overtime ? 0.0 : remainMin),
                         style: TextStyle(
                           fontFamily: 'monospace',
                           fontSize: 17,
@@ -331,7 +358,7 @@ class _ActiveCard extends StatelessWidget {
                     ],
                   ),
                   Text(
-                    openEnded ? '${state.fmtMoney(rate)}/min' : state.fmtMoney(liveValue),
+                    openEnded ? '${formatMoney(rate)}/min' : formatMoney(liveValue),
                     style: TextStyle(fontSize: 11, color: AppColors.text.withValues(alpha: 0.65)),
                   ),
                 ],
@@ -340,14 +367,14 @@ class _ActiveCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           if (openEnded) ...[
-            _EstimateNow(value: liveValue, elapsedMin: elapsedMin, fmtMoney: state.fmtMoney),
+            _EstimateNow(value: liveValue, elapsedMin: elapsedMin),
             const SizedBox(height: 10),
             EndlessRail(color: color),
             const SizedBox(height: 8),
           ] else ...[
-            StripedProgress(progress: progress, color: color, pulse: overtime && state.pulseOnOvertime),
+            StripedProgress(progress: progress, color: color, pulse: overtime && _pulseOnOvertime),
             const SizedBox(height: 8),
-            _ExtendTimeRow(state: state, rentalId: rental.id, fg: toy.ink.fg),
+            _ExtendTimeRow(cubit: cubit, rentalId: rental.id, fg: toy.ink.fg),
             const SizedBox(height: 8),
           ],
           Row(
@@ -356,7 +383,7 @@ class _ActiveCard extends StatelessWidget {
                 child: Pressable(
                   child: OutlinedButton(
                     key: TestKeys.cancelRentalButton(rental.id),
-                    onPressed: () => state.cancelActive(rental.id),
+                    onPressed: () => cubit.cancelActive(rental.id),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.text,
                       side: BorderSide(color: AppColors.text.withValues(alpha: 0.14)),
