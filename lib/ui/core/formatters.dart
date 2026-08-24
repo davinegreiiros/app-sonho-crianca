@@ -1,7 +1,7 @@
 // Pure, Flutter-independent display formatters shared across features
 // (spec 014-migracao-relatorio) — extracted out of `AppState`
 // (`fmtMoney`/`whenLabel`, unchanged behavior) so `ReportCubit` doesn't
-// duplicate them, and future Cubits (fatia 016) can reuse them too
+// duplicate them, and future Cubits (fatia 017+) can reuse them too
 // instead of re-deriving the same formatting.
 
 /// `R$ 12,50`-style money label — always 2 decimals, comma as the

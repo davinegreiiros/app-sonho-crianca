@@ -3,7 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../../../domain/models/business_settings.dart';
-import '../../../../services/pix_payload.dart';
+import '../../../../data/services/pix_payload.dart';
 import '../../../../test_keys.dart';
 import '../../../../theme/app_colors.dart';
 import '../../../../widgets/animations/bounce.dart';

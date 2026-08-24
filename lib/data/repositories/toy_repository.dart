@@ -58,8 +58,11 @@ class ToyRepository extends ChangeNotifier {
   }
 
   /// Unconditional removal — the "refuse if it has rentals" guard needs
-  /// `Rental` data this repository doesn't have, so it stays in
-  /// `AppState.removeToy` (which already holds `rentals`) until fatia 014.
+  /// `Rental` data this repository deliberately doesn't have, so it lives
+  /// one layer up: `AppState.removeToy` (old world) and
+  /// `ToyCatalogCubit.removeToy` (new world, spec
+  /// 015-migracao-catalogo-grade) each hold their own `rentals` reference
+  /// and apply the same check before calling this.
   void remove(String id) {
     _toys = _toys.where((t) => t.id != id).toList();
     notifyListeners();

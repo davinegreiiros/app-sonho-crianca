@@ -4,12 +4,12 @@ import 'package:flutter/material.dart';
 import '../data/repositories/business_settings_repository.dart';
 import '../data/repositories/rental_repository.dart';
 import '../data/repositories/toy_repository.dart';
+import '../data/services/local_rental_notifier.dart';
+import '../data/services/notification_texts.dart';
+import '../data/services/rental_notifier.dart';
 import '../domain/models/business_settings.dart';
 import '../domain/models/rental.dart';
 import '../domain/models/toy.dart';
-import '../notifications/local_rental_notifier.dart';
-import '../notifications/notification_texts.dart';
-import '../notifications/rental_notifier.dart';
 import '../theme/app_colors.dart';
 import '../ui/core/formatters.dart';
 
@@ -67,7 +67,7 @@ class AppState extends ChangeNotifier {
     // BusinessSettings ownership moved to BusinessSettingsRepository (spec
     // 011-migracao-configuracoes-negocio) — AppState only relays its
     // changes so end_rental_dialog.dart/pix_qr_sheet.dart (not migrated
-    // yet, fatia 016) keep working unchanged off `businessSettings` below.
+    // yet, fatia 017+) keep working unchanged off `businessSettings` below.
     _businessSettingsRepository.addListener(notifyListeners);
     _businessSettingsRepository.load();
     // Toy ownership moved to ToyRepository (spec

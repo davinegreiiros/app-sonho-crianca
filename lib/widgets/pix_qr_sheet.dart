@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
-import '../services/pix_payload.dart';
+import '../data/services/pix_payload.dart';
 import '../state/app_state.dart';
 import '../test_keys.dart';
 import '../theme/app_colors.dart';

@@ -8,7 +8,7 @@ import '../services/business_settings_local_service.dart';
 /// `main.dart`) consumed both by `BusinessSettingsCubit` (new world,
 /// `lib/ui/features/business_settings/`) and by `AppState.businessSettings`
 /// (old world, kept as a thin proxy until `end_rental_dialog.dart`/
-/// `pix_qr_sheet.dart` migrate in fatia 014). Never construct two of these
+/// `pix_qr_sheet.dart` migrate in fatia 017+). Never construct two of these
 /// in the same running app — that would split the source of truth.
 class BusinessSettingsRepository extends ChangeNotifier {
   BusinessSettingsRepository({BusinessSettingsLocalService? service})

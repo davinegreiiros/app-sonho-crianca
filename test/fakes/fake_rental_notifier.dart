@@ -1,4 +1,4 @@
-import 'package:sonho_de_crianca/notifications/rental_notifier.dart';
+import 'package:sonho_de_crianca/data/services/rental_notifier.dart';
 
 /// Test double for [RentalNotifier]: records calls in memory instead of
 /// touching a real platform channel (spec 005-notificacoes-locais, spec
