@@ -47,7 +47,7 @@ Nada pode quebrar em hipótese nenhuma. Se a implementação de uma spec introdu
 
 ## Segurança (baseline)
 
-App é 100% local hoje: sem `INTERNET` permission, sem backend, sem persistência entre sessões. Isso é o piso de segurança a manter por padrão — qualquer spec que:
+App é 100% local hoje: sem `INTERNET` permission, sem backend. Dado de catálogo/locação persiste em disco (SQLite via `sqflite`, sandbox do app — spec 020-persistencia-local); `BusinessSettings` persiste via `SharedPreferences`. Persistência local (sem sair do aparelho) é o piso a manter por padrão — qualquer spec que:
 
 - Adicione permissão nova (Android `AndroidManifest.xml` / iOS `Info.plist`) precisa justificar no `plan.md` por que é mínima e necessária.
 - Adicione persistência de dado pessoal (nome de criança, nome/telefone de responsável) precisa endereçar em `spec.md` onde o dado fica, por quanto tempo, e se é sensível o bastante pra precisar de criptografia em repouso.

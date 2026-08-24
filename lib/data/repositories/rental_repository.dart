@@ -1,36 +1,50 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter/foundation.dart';
 
 import '../../domain/models/rental.dart';
+import '../services/rental_local_service.dart';
 
 /// Single source of truth for the toy-rental list (spec
-/// 013-migracao-rental-repository-fundacao) — a foundation slice: only
-/// structural ownership of `List<Rental>` moves here (adding a new rental,
-/// removing a cancelled one). Everything else (creating/extending/ending a
-/// rental, notification scheduling, report filters) still lives in
-/// `AppState` until fatias 014-016 migrate their respective screens.
+/// 013-migracao-rental-repository-fundacao).
 ///
 /// `Rental` is a mutable domain model by design (see
 /// `lib/domain/models/rental.dart`) — mutating a field on a `Rental`
-/// already in [rentals] (`AppState.extendActive`, `Rental.finish()` in
-/// `confirmEnd`) needs no method here: it's the same object instance,
-/// visible to every reader, whether or not this repository is involved.
+/// already in [rentals] needs no method here: it's the same object
+/// instance, visible to every reader, whether or not this repository is
+/// involved.
 ///
-/// Unlike `ToyRepository`/`BusinessSettingsRepository`, [rentals] is the
-/// live, directly-mutable list itself — not `List.unmodifiable`. `AppState`
-/// (and its tests) already relied on `rentals` being indexable/mutable in
-/// place (e.g. replacing an element by index to backdate a `Rental`, since
-/// `startedAt` is `final`); wrapping it read-only here would be a
-/// behavior change this foundation slice explicitly isn't supposed to
-/// make. [add]/[removeById] are still the intended way to change
-/// membership — they're the only calls that notify listeners.
+/// [rentals] is the live, directly-mutable list itself — not
+/// `List.unmodifiable`. `AppState` (e outros testes) já dependem de
+/// `rentals` ser indexável/mutável em lugar (ex.: substituir um elemento
+/// por índice pra "voltar no tempo" um `Rental`, já que `startedAt` é
+/// `final`). Por isso [load] nunca reatribui [rentals] (é `final`) — só
+/// limpa e repopula em lugar.
 ///
-/// No `Service`/persistence layer: rentals aren't saved anywhere today
-/// (same situation `ToyRepository` is in) — this seeds in memory, same as
-/// `AppState._seed()` always did.
+/// Persistência (spec 020-persistencia-local): [_localService], quando
+/// injetado (sempre em `main.dart`; `null` na maioria dos testes), faz
+/// [load] hidratar do SQLite e cada mutação persistir em background —
+/// mesmo padrão otimista de `ToyRepository`. O construtor default começa
+/// **vazio**: o app real nunca semeia locação fictícia, só o catálogo tem
+/// seed inicial. [withDemoSeed] existe só pra teste, ver doc no construtor.
 class RentalRepository extends ChangeNotifier {
-  RentalRepository() : rentals = _seedInitial();
+  RentalRepository({RentalLocalService? localService})
+      : rentals = [],
+        _localService = localService;
+
+  /// Mesma lista de 11 locações de demonstração (`a1`-`a3` ativas,
+  /// `h1`-`h8` finalizadas) que `RentalRepository()` sempre semeou antes da
+  /// spec 020 — vários testes dependem implicitamente desses dados. O app
+  /// real nunca usa este construtor: `main.dart` usa `RentalRepository()`
+  /// (vazio) + `load()`.
+  RentalRepository.withDemoSeed({RentalLocalService? localService})
+      : rentals = _seedInitial(),
+        _localService = localService;
 
   final List<Rental> rentals;
+  final RentalLocalService? _localService;
+
+  bool _disposed = false;
 
   static List<Rental> _seedInitial() {
     DateTime minAgo(num n) => DateTime.now().subtract(Duration(seconds: (n * 60).round()));
@@ -56,6 +70,22 @@ class RentalRepository extends ChangeNotifier {
       Rental(id: 'h7', toyId: 'cama', childName: 'Miguel', guardianName: 'Larissa Pinto', startedAt: dAgo(3.4), durationMin: 30, price: 15, status: RentalStatus.done, endedAt: dAgo(3.4).add(const Duration(minutes: 30)), paymentMethod: PaymentMethod.pix),
       Rental(id: 'h8', toyId: 'piscina', childName: 'Helena', guardianName: 'Diego Farias', startedAt: dAgo(5.5), durationMin: 20, price: 10, status: RentalStatus.done, endedAt: dAgo(5.5).add(const Duration(minutes: 20)), paymentMethod: PaymentMethod.pix),
     ];
+  }
+
+  /// Hidrata do banco local. Sem [_localService] (a maioria dos testes),
+  /// não faz nada — [rentals] fica no default do construtor usado (`[]` ou
+  /// a seed de demonstração). Com [_localService]: substitui o conteúdo de
+  /// [rentals] pelo que está persistido (vazio na primeira execução real —
+  /// sem seed de demonstração, ver classe acima).
+  Future<void> load() async {
+    final service = _localService;
+    if (service == null) return;
+    final loaded = await service.loadAll();
+    if (_disposed) return;
+    rentals
+      ..clear()
+      ..addAll(loaded);
+    notifyListeners();
   }
 
   /// Builds a new active `Rental` (same id scheme `AppState.submitNew`
@@ -90,11 +120,13 @@ class RentalRepository extends ChangeNotifier {
   void add(Rental rental) {
     rentals.add(rental);
     notifyListeners();
+    unawaited(_persist(rental));
   }
 
   void removeById(String id) {
     rentals.removeWhere((r) => r.id == id);
     notifyListeners();
+    unawaited(_delete(id));
   }
 
   /// Adds `addMinutes`-worth of duration/price to an active fixed-duration
@@ -110,6 +142,7 @@ class RentalRepository extends ChangeNotifier {
     r.durationMin = durationMin;
     r.price = price;
     notifyListeners();
+    unawaited(_persist(r));
   }
 
   /// Marks a rental done and notifies — same "AppState mutated without
@@ -122,5 +155,32 @@ class RentalRepository extends ChangeNotifier {
     if (finalPrice != null) r.price = finalPrice;
     r.finish(method);
     notifyListeners();
+    unawaited(_persist(r));
+  }
+
+  Future<void> _persist(Rental rental) async {
+    final service = _localService;
+    if (service == null) return;
+    try {
+      await service.upsert(rental);
+    } catch (e) {
+      debugPrint('RentalRepository: falha ao persistir locação ${rental.id}: $e');
+    }
+  }
+
+  Future<void> _delete(String id) async {
+    final service = _localService;
+    if (service == null) return;
+    try {
+      await service.delete(id);
+    } catch (e) {
+      debugPrint('RentalRepository: falha ao remover locação $id: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
   }
 }

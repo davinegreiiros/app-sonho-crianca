@@ -7,14 +7,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:sonho_de_crianca/data/repositories/rental_repository.dart';
 import 'package:sonho_de_crianca/main.dart';
 import 'package:sonho_de_crianca/domain/models/toy.dart';
 import 'package:sonho_de_crianca/state/app_state.dart';
 import 'package:sonho_de_crianca/test_keys.dart';
 import 'package:sonho_de_crianca/widgets/category_icon.dart';
 
-Future<AppState> _pumpApp(WidgetTester tester) async {
-  await tester.pumpWidget(const SonhoDeCriancaApp());
+Future<AppState> _pumpApp(WidgetTester tester, {RentalRepository? rentalRepository}) async {
+  await tester.pumpWidget(SonhoDeCriancaApp(rentalRepository: rentalRepository));
   await tester.pump(const Duration(milliseconds: 400));
   return Provider.of<AppState>(tester.element(find.byType(MaterialApp)), listen: false);
 }
@@ -34,7 +35,7 @@ void main() {
   });
 
   testWidgets('tempo-corrido active card says "Parar e cobrar", fixed-duration says "Finalizar"', (tester) async {
-    final state = await _pumpApp(tester);
+    final state = await _pumpApp(tester, rentalRepository: RentalRepository.withDemoSeed());
 
     state.openNew();
     state.setDraftToy('cama');

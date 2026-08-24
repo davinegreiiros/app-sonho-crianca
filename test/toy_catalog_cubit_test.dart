@@ -107,7 +107,7 @@ void main() {
     );
 
     test('availabilityOf() matches the seed (a1/a2/a3 active against carrinho/pula/patinete)', () {
-      final cubit = ToyCatalogCubit(ToyRepository(), RentalRepository());
+      final cubit = ToyCatalogCubit(ToyRepository(), RentalRepository.withDemoSeed());
 
       final carrinho = cubit.state.toys.firstWhere((t) => t.id == 'carrinho'); // qty 2, 1 active (a1)
       final cama = cubit.state.toys.firstWhere((t) => t.id == 'cama'); // qty 1, 0 active
@@ -143,7 +143,7 @@ void main() {
 
     test('removeToy() refuses a toy with any rental (active or done), succeeds otherwise', () {
       final toyRepository = ToyRepository();
-      final rentalRepository = RentalRepository();
+      final rentalRepository = RentalRepository.withDemoSeed();
       final cubit = ToyCatalogCubit(toyRepository, rentalRepository);
 
       // 'carrinho' has rentals in the seed (a1 active, h1/h6 done).

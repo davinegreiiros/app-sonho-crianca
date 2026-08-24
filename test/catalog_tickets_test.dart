@@ -27,8 +27,8 @@ Finder _ticketsIn(Finder card) =>
 
 bool _isFree(Widget ticket) => (ticket as dynamic).free as bool;
 
-Future<AppState> _pumpApp(WidgetTester tester) async {
-  await tester.pumpWidget(const SonhoDeCriancaApp());
+Future<AppState> _pumpApp(WidgetTester tester, {RentalRepository? rentalRepository}) async {
+  await tester.pumpWidget(SonhoDeCriancaApp(rentalRepository: rentalRepository));
   await tester.pump(const Duration(milliseconds: 400));
   final state = Provider.of<AppState>(tester.element(find.byType(MaterialApp)), listen: false);
   state.setTab(AppTab.catalog);
@@ -43,7 +43,7 @@ void main() {
   SharedPreferences.setMockInitialValues({});
 
   testWidgets('mixed card shows one free and one in-use ticket', (tester) async {
-    await _pumpApp(tester);
+    await _pumpApp(tester, rentalRepository: RentalRepository.withDemoSeed());
 
     // Seed: 'carrinho' has qty 2, 1 active rental against it (a1).
     final card = find.byKey(TestKeys.toyCardKey('carrinho'));

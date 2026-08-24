@@ -17,8 +17,20 @@ void main() {
   SharedPreferences.setMockInitialValues({});
 
   group('RentalRepository', () {
-    test('seeds the same 11 rentals AppState used to (3 active, 8 done)', () {
+    // Spec 020 (persistência local): o construtor default passou a começar
+    // vazio — o app real nunca semeia locação de demonstração, só o
+    // catálogo tem seed inicial (`load()` hidrata do banco quando há
+    // `_localService`). A seed de 11 locações que `RentalRepository()`
+    // sempre teve virou `RentalRepository.withDemoSeed()`, usada só por
+    // teste.
+    test('the default constructor starts empty', () {
       final repository = RentalRepository();
+
+      expect(repository.rentals, isEmpty);
+    });
+
+    test('withDemoSeed() seeds the same 11 rentals AppState used to (3 active, 8 done)', () {
+      final repository = RentalRepository.withDemoSeed();
 
       expect(repository.rentals, hasLength(11));
       expect(repository.rentals.map((r) => r.id), containsAll(['a1', 'a2', 'a3', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'h7', 'h8']));
@@ -27,7 +39,7 @@ void main() {
     });
 
     test('add() appends and notifies', () {
-      final repository = RentalRepository();
+      final repository = RentalRepository.withDemoSeed();
       var notified = false;
       repository.addListener(() => notified = true);
 
@@ -48,7 +60,7 @@ void main() {
     });
 
     test('removeById() drops the matching rental and notifies', () {
-      final repository = RentalRepository();
+      final repository = RentalRepository.withDemoSeed();
       var notified = false;
       repository.addListener(() => notified = true);
 
@@ -61,7 +73,7 @@ void main() {
   });
 
   test('AppState.rentals reflects the same Repository instance when injected', () {
-    final repository = RentalRepository();
+    final repository = RentalRepository.withDemoSeed();
     final state = AppState(notifications: FakeRentalNotifier(), rentalRepository: repository);
 
     repository.removeById('a1');

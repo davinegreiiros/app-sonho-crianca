@@ -23,7 +23,7 @@ void main() {
 
   group('RentalRepository.extend/finish', () {
     test('extend() mutates duration/price and notifies', () {
-      final repository = RentalRepository();
+      final repository = RentalRepository.withDemoSeed();
       final target = repository.rentals.firstWhere((r) => r.status == RentalStatus.active);
       var notified = false;
       repository.addListener(() => notified = true);
@@ -37,7 +37,7 @@ void main() {
     });
 
     test('finish() sets status/paymentMethod, optionally overrides price, and notifies', () {
-      final repository = RentalRepository();
+      final repository = RentalRepository.withDemoSeed();
       final target = repository.rentals.firstWhere((r) => r.status == RentalStatus.active);
       var notified = false;
       repository.addListener(() => notified = true);
@@ -52,7 +52,7 @@ void main() {
     });
 
     test('finish() without finalPrice leaves price untouched (fixed-duration rental)', () {
-      final repository = RentalRepository();
+      final repository = RentalRepository.withDemoSeed();
       final target = repository.rentals.firstWhere((r) => r.status == RentalStatus.active);
       final originalPrice = target.price;
 
@@ -64,7 +64,7 @@ void main() {
 
   group('ActiveRentalsCubit', () {
     test('starts with only the seed\'s active rentals (a1-a3)', () {
-      final cubit = ActiveRentalsCubit(ToyRepository(), RentalRepository(), notifications: FakeRentalNotifier());
+      final cubit = ActiveRentalsCubit(ToyRepository(), RentalRepository.withDemoSeed(), notifications: FakeRentalNotifier());
 
       expect(cubit.state.activeRentals, hasLength(3));
       expect(cubit.state.activeRentals.every((r) => r.status == RentalStatus.active), isTrue);
@@ -73,7 +73,7 @@ void main() {
     });
 
     test('extendActive() grows duration/price and reschedules notifications', () {
-      final rentalRepository = RentalRepository();
+      final rentalRepository = RentalRepository.withDemoSeed();
       final notifier = FakeRentalNotifier();
       final cubit = ActiveRentalsCubit(ToyRepository(), rentalRepository, notifications: notifier);
       final target = rentalRepository.rentals.firstWhere((r) => r.id == 'a1'); // carrinho, 15min, R$10
@@ -89,7 +89,7 @@ void main() {
     });
 
     test('cancelActive() removes the rental and cancels its notifications', () {
-      final rentalRepository = RentalRepository();
+      final rentalRepository = RentalRepository.withDemoSeed();
       final notifier = FakeRentalNotifier();
       final cubit = ActiveRentalsCubit(ToyRepository(), rentalRepository, notifications: notifier);
 
@@ -102,7 +102,7 @@ void main() {
     });
 
     test('full end flow: openEnd -> selectPayment -> confirmEnd finishes the rental', () {
-      final rentalRepository = RentalRepository();
+      final rentalRepository = RentalRepository.withDemoSeed();
       final cubit = ActiveRentalsCubit(ToyRepository(), rentalRepository, notifications: FakeRentalNotifier());
 
       cubit.openEnd('a1');
@@ -121,7 +121,7 @@ void main() {
 
     test('showPixQrStep() freezes the price, confirmEnd() reuses the frozen value', () {
       final toyRepository = ToyRepository();
-      final rentalRepository = RentalRepository();
+      final rentalRepository = RentalRepository.withDemoSeed();
       final cubit = ActiveRentalsCubit(toyRepository, rentalRepository, notifications: FakeRentalNotifier());
       // Open-ended rental so computeFinalPrice actually varies with time.
       final openEnded = rentalRepository.addNew(
@@ -151,7 +151,7 @@ void main() {
 
     test('AppState sees the same rentals after extend/cancel/finish through the shared Repository', () {
       final toyRepository = ToyRepository();
-      final rentalRepository = RentalRepository();
+      final rentalRepository = RentalRepository.withDemoSeed();
       final cubit = ActiveRentalsCubit(toyRepository, rentalRepository, notifications: FakeRentalNotifier());
       final state = AppState(
         notifications: FakeRentalNotifier(),

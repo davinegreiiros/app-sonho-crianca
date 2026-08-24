@@ -68,8 +68,11 @@ class AppState extends ChangeNotifier {
     // 011-migracao-configuracoes-negocio) — AppState only relays its
     // changes so end_rental_dialog.dart/pix_qr_sheet.dart (not migrated
     // yet, fatia 017+) keep working unchanged off `businessSettings` below.
+    // `load()` (dos 3 Repositories) não é mais disparado daqui (spec
+    // 020-persistencia-local) — vira responsabilidade explícita de
+    // `main.dart`, aguardado antes do primeiro frame (sem isso, o boot
+    // "piscaria" Catálogo/Painel vazios até o load assíncrono resolver).
     _businessSettingsRepository.addListener(notifyListeners);
-    _businessSettingsRepository.load();
     // Toy ownership moved to ToyRepository (spec
     // 012-migracao-catalogo-criacao) — same relay pattern, needed by
     // every other tab/sheet that reads `toys`/`toyById` and hasn't

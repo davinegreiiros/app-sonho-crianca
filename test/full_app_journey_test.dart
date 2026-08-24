@@ -23,6 +23,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:sonho_de_crianca/data/repositories/rental_repository.dart';
 import 'package:sonho_de_crianca/main.dart';
 import 'package:sonho_de_crianca/state/app_state.dart';
 import 'package:sonho_de_crianca/test_keys.dart';
@@ -41,14 +42,14 @@ Future<void> _settleFrames(WidgetTester tester, {int frames = 8}) async {
   }
 }
 
-Future<AppState> _pumpApp(WidgetTester tester) async {
+Future<AppState> _pumpApp(WidgetTester tester, {RentalRepository? rentalRepository}) async {
   // Deliberately keeps flutter_test's default canvas (matches every other
   // widget test in this suite) — a phone-sized override was tried and
   // caused an unrelated AppHeader overflow (test fonts measure wider than
   // real device fonts here), so off-screen content is handled per-tap
   // with `ensureVisible`/`scrollUntilVisible` instead, same as
   // `pix_flow_test.dart`/`catalog_tickets_test.dart` already do.
-  await tester.pumpWidget(const SonhoDeCriancaApp());
+  await tester.pumpWidget(SonhoDeCriancaApp(rentalRepository: rentalRepository));
   await tester.pump(_settle);
   return Provider.of<AppState>(tester.element(find.byType(MaterialApp)), listen: false);
 }
@@ -189,7 +190,7 @@ void main() {
     });
 
     testWidgets('cancels an active rental', (tester) async {
-      final appState = await _pumpApp(tester);
+      final appState = await _pumpApp(tester, rentalRepository: RentalRepository.withDemoSeed());
 
       final before = appState.activeRentals.length;
       final target = appState.activeRentals.first;

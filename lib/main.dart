@@ -5,6 +5,9 @@ import 'package:provider/provider.dart';
 import 'data/repositories/business_settings_repository.dart';
 import 'data/repositories/rental_repository.dart';
 import 'data/repositories/toy_repository.dart';
+import 'data/services/app_database.dart';
+import 'data/services/rental_local_service.dart';
+import 'data/services/toy_local_service.dart';
 import 'screens/home_shell.dart';
 import 'state/app_state.dart';
 import 'theme/app_theme.dart';
@@ -15,12 +18,48 @@ import 'ui/features/rental/view_models/active_rentals_cubit.dart';
 import 'ui/features/rental/view_models/new_rental_cubit.dart';
 import 'ui/features/report/view_models/report_cubit.dart';
 
-void main() {
-  runApp(const SonhoDeCriancaApp());
+/// Bootstrap assíncrono (spec 020-persistencia-local): abre o banco local e
+/// espera os 3 `load()` resolverem **antes** do primeiro frame — sem isso o
+/// boot mostraria Catálogo/Painel vazios por um instante até os dados
+/// persistidos chegarem (`WidgetsFlutterBinding.ensureInitialized()` é
+/// exigido pelo `sqflite` antes de abrir um banco fora da árvore de
+/// widgets).
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  final appDatabase = AppDatabase();
+  final businessSettingsRepository = BusinessSettingsRepository();
+  final toyRepository = ToyRepository(localService: ToyLocalService(appDatabase));
+  final rentalRepository = RentalRepository(localService: RentalLocalService(appDatabase));
+  await Future.wait([
+    businessSettingsRepository.load(),
+    toyRepository.load(),
+    rentalRepository.load(),
+  ]);
+
+  runApp(SonhoDeCriancaApp(
+    businessSettingsRepository: businessSettingsRepository,
+    toyRepository: toyRepository,
+    rentalRepository: rentalRepository,
+  ));
 }
 
 class SonhoDeCriancaApp extends StatelessWidget {
-  const SonhoDeCriancaApp({super.key});
+  /// Os 3 Repositories são opcionais só pra teste — `tester.pumpWidget(const
+  /// SonhoDeCriancaApp())` continua funcionando sem banco/SharedPreferences
+  /// real (cada um cai no seu próprio construtor default, síncrono, sem
+  /// `_localService`). Em produção, `main()` sempre passa os 3 já
+  /// carregados.
+  const SonhoDeCriancaApp({
+    super.key,
+    this.businessSettingsRepository,
+    this.toyRepository,
+    this.rentalRepository,
+  });
+
+  final BusinessSettingsRepository? businessSettingsRepository;
+  final ToyRepository? toyRepository;
+  final RentalRepository? rentalRepository;
 
   @override
   Widget build(BuildContext context) {
@@ -34,13 +73,13 @@ class SonhoDeCriancaApp extends StatelessWidget {
         // themselves ChangeNotifiers and provider asserts against exposing a
         // Listenable through a provider type that won't propagate updates.
         ChangeNotifierProvider<BusinessSettingsRepository>(
-          create: (_) => BusinessSettingsRepository(),
+          create: (_) => businessSettingsRepository ?? BusinessSettingsRepository(),
         ),
         ChangeNotifierProvider<ToyRepository>(
-          create: (_) => ToyRepository(),
+          create: (_) => toyRepository ?? ToyRepository(),
         ),
         ChangeNotifierProvider<RentalRepository>(
-          create: (_) => RentalRepository(),
+          create: (_) => rentalRepository ?? RentalRepository(),
         ),
         ChangeNotifierProvider<AppState>(
           create: (context) => AppState(

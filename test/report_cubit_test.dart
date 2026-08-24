@@ -14,7 +14,7 @@ import 'package:sonho_de_crianca/ui/features/report/view_models/report_state.dar
 void main() {
   group('ReportCubit', () {
     test('defaults to "today" and only counts rentals finished today', () {
-      final rentalRepository = RentalRepository();
+      final rentalRepository = RentalRepository.withDemoSeed();
       final cubit = ReportCubit(rentalRepository, ToyRepository());
 
       // Seed: h1/h2/h3 finished "today" (todayAt helper), h4-h8 finished
@@ -27,7 +27,7 @@ void main() {
     });
 
     test('setPeriod(all) includes every finished rental, none of the active ones', () {
-      final rentalRepository = RentalRepository();
+      final rentalRepository = RentalRepository.withDemoSeed();
       final cubit = ReportCubit(rentalRepository, ToyRepository());
 
       cubit.setPeriod(ReportPeriod.all);

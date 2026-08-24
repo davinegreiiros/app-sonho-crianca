@@ -18,7 +18,7 @@ void main() {
 
   group('HomeCubit', () {
     test('seed: 3 active, h1-h3 finished today (35 total), h4-h8 finished earlier', () {
-      final cubit = HomeCubit(ToyRepository(), RentalRepository());
+      final cubit = HomeCubit(ToyRepository(), RentalRepository.withDemoSeed());
 
       expect(cubit.state.activeCount, 3);
       expect(cubit.state.doneTodayCount, 3);
@@ -28,7 +28,7 @@ void main() {
     });
 
     test('recentActivity mixes active + done-today, most recent first, capped at 4', () {
-      final cubit = HomeCubit(ToyRepository(), RentalRepository());
+      final cubit = HomeCubit(ToyRepository(), RentalRepository.withDemoSeed());
 
       expect(cubit.state.recentActivity, hasLength(4));
       for (var i = 1; i < cubit.state.recentActivity.length; i++) {
@@ -43,7 +43,7 @@ void main() {
     });
 
     test('availableCount sums ComputeToyAvailability across the whole catalog', () {
-      final cubit = HomeCubit(ToyRepository(), RentalRepository());
+      final cubit = HomeCubit(ToyRepository(), RentalRepository.withDemoSeed());
 
       // carrinho(2,-1)+cama(1)+pula(2,-1)+piscina(1)+patinete(2,-1) = 1+1+1+1+1 = 5
       expect(cubit.state.availableCount, 5);
