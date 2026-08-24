@@ -1,25 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../domain/models/toy.dart';
-import '../../state/app_state.dart';
-import '../../test_keys.dart';
-import '../../theme/app_colors.dart';
-import '../../widgets/animations/cascade.dart';
-import '../../widgets/animations/pressable.dart';
-import '../../widgets/category_icon.dart';
-import '../../widgets/modal_launchers.dart';
-import '../../widgets/toy_icon.dart';
+import '../../../../domain/models/toy.dart';
+import '../../../../test_keys.dart';
+import '../../../../theme/app_colors.dart';
+import '../../../../widgets/animations/cascade.dart';
+import '../../../../widgets/animations/pressable.dart';
+import '../../../../widgets/category_icon.dart';
+import '../../../../widgets/modal_launchers.dart';
+import '../../../../widgets/toy_icon.dart';
+import '../view_models/toy_catalog_cubit.dart';
 
-class CatalogTab extends StatefulWidget {
-  const CatalogTab({super.key});
+/// Migrated in spec 015-migracao-catalogo-grade: reads/writes through
+/// [ToyCatalogCubit] instead of `AppState`.
+class CatalogView extends StatefulWidget {
+  const CatalogView({super.key});
 
   @override
-  State<CatalogTab> createState() => _CatalogTabState();
+  State<CatalogView> createState() => _CatalogViewState();
 }
 
-class _CatalogTabState extends State<CatalogTab> with TickerProviderStateMixin {
+class _CatalogViewState extends State<CatalogView> with TickerProviderStateMixin {
   // Text/tag/tickets/inputs block below the image is a fixed height
   // regardless of column width, so the card's aspect ratio has to be
   // derived from the actual column width rather than guessed — otherwise
@@ -46,8 +48,9 @@ class _CatalogTabState extends State<CatalogTab> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
-    final cascade = _cascadeFor(state.toys.length);
+    final cubit = context.watch<ToyCatalogCubit>();
+    final catalog = cubit.state;
+    final cascade = _cascadeFor(catalog.toys.length);
     return LayoutBuilder(
       builder: (context, constraints) {
         final columnWidth = (constraints.maxWidth - 40 - 14) / 2;
@@ -88,8 +91,8 @@ class _CatalogTabState extends State<CatalogTab> with TickerProviderStateMixin {
                   childAspectRatio: aspectRatio,
                 ),
                 delegate: SliverChildBuilderDelegate(
-                  (context, i) => cascade.item(i, pop: true, child: _ToyCard(state: state, toy: state.toys[i])),
-                  childCount: state.toys.length,
+                  (context, i) => cascade.item(i, pop: true, child: _ToyCard(cubit: cubit, toy: catalog.toys[i])),
+                  childCount: catalog.toys.length,
                 ),
               ),
             ),
@@ -101,13 +104,13 @@ class _CatalogTabState extends State<CatalogTab> with TickerProviderStateMixin {
 }
 
 class _ToyCard extends StatelessWidget {
-  const _ToyCard({required this.state, required this.toy});
-  final AppState state;
+  const _ToyCard({required this.cubit, required this.toy});
+  final ToyCatalogCubit cubit;
   final Toy toy;
 
   @override
   Widget build(BuildContext context) {
-    final avail = state.toyAvailable(toy);
+    final avail = cubit.state.availabilityOf(toy);
     return Container(
       key: TestKeys.toyCardKey(toy.id),
       decoration: BoxDecoration(
@@ -138,7 +141,7 @@ class _ToyCard extends StatelessWidget {
                   child: Pressable(
                     child: InkWell(
                       borderRadius: BorderRadius.circular(20),
-                      onTap: () => _confirmRemove(context, state, toy),
+                      onTap: () => _confirmRemove(context, cubit, toy),
                       child: Container(
                         width: 24,
                         height: 24,
@@ -184,7 +187,7 @@ class _ToyCard extends StatelessWidget {
                         initial: toy.price.toStringAsFixed(0),
                         onChanged: (v) {
                           final n = double.tryParse(v);
-                          if (n != null) state.updateToyPrice(toy.id, n);
+                          if (n != null) cubit.updatePrice(toy.id, n);
                         },
                       ),
                     ),
@@ -196,7 +199,7 @@ class _ToyCard extends StatelessWidget {
                         initial: '${toy.blockMin}',
                         onChanged: (v) {
                           final n = int.tryParse(v);
-                          if (n != null && n > 0) state.updateToyBlock(toy.id, n);
+                          if (n != null && n > 0) cubit.updateBlockMinutes(toy.id, n);
                         },
                       ),
                     ),
@@ -357,8 +360,8 @@ class _HalftonePainter extends CustomPainter {
   bool shouldRepaint(covariant _HalftonePainter oldDelegate) => oldDelegate.dotColor != dotColor;
 }
 
-void _confirmRemove(BuildContext context, AppState state, Toy toy) {
-  final removed = state.removeToy(toy.id);
+void _confirmRemove(BuildContext context, ToyCatalogCubit cubit, Toy toy) {
+  final removed = cubit.removeToy(toy.id);
   final messenger = ScaffoldMessenger.of(context);
   messenger.hideCurrentSnackBar();
   messenger.showSnackBar(

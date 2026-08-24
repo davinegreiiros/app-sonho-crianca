@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:sonho_de_crianca/main.dart';
+import 'package:sonho_de_crianca/data/repositories/rental_repository.dart';
 import 'package:sonho_de_crianca/data/repositories/toy_repository.dart';
 import 'package:sonho_de_crianca/domain/models/toy.dart';
 import 'package:sonho_de_crianca/state/app_state.dart';
@@ -17,7 +18,7 @@ import 'package:sonho_de_crianca/theme/app_colors.dart';
 import 'package:sonho_de_crianca/ui/features/catalog/view_models/toy_catalog_cubit.dart';
 import 'package:sonho_de_crianca/ui/features/catalog/views/add_toy_sheet_view.dart';
 
-/// Ticket widgets are private (`_TicketStub`) to `catalog_tab.dart`, so
+/// Ticket widgets are private (`_TicketStub`) to `catalog_view.dart`, so
 /// they're matched by runtime type name and their `free` field is read
 /// dynamically — a normal way to probe a private widget from a test in a
 /// different library without exposing it publicly just for testing.
@@ -118,7 +119,7 @@ void main() {
     // AppState — no ChangeNotifierProvider<AppState> needed here anymore.
     await tester.pumpWidget(
       BlocProvider(
-        create: (_) => ToyCatalogCubit(ToyRepository()),
+        create: (_) => ToyCatalogCubit(ToyRepository(), RentalRepository()),
         child: const MaterialApp(home: Scaffold(body: AddToySheetView())),
       ),
     );

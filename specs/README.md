@@ -38,7 +38,7 @@ Sem `spec.md` aprovado, sem código de feature. Bugfix simples e chore não prec
 | [012](012-migracao-catalogo-criacao/spec.md) | Migração: Catálogo — criação de brinquedo (Repository + Cubit + View) | Implemented | 010, 011 |
 | [013](013-migracao-rental-repository-fundacao/spec.md) | Migração: `RentalRepository` — fundação | Implemented | 010, 012 |
 | [014](014-migracao-relatorio/spec.md) | Migração: Relatório | Implemented | 013 |
-| 015 | Migração: Catálogo — grade do catálogo | Planned | 012, 013 |
+| [015](015-migracao-catalogo-grade/spec.md) | Migração: Catálogo — grade e tickets de disponibilidade | Implemented | 012, 013 |
 | 016 | Migração: Locação (nova/ativa/encerrar) + PIX + notificações | Planned | 013 |
 
 Todas em `Draft` — cada uma tem "Dúvidas em aberto" que precisa de resposta sua antes de virar `Approved` e ganhar `plan.md`/`tasks.md`.

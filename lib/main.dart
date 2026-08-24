@@ -55,7 +55,7 @@ class SonhoDeCriancaApp extends StatelessWidget {
                 create: (context) => BusinessSettingsCubit(context.read<BusinessSettingsRepository>()),
               ),
               BlocProvider<ToyCatalogCubit>(
-                create: (context) => ToyCatalogCubit(context.read<ToyRepository>()),
+                create: (context) => ToyCatalogCubit(context.read<ToyRepository>(), context.read<RentalRepository>()),
               ),
               BlocProvider<ReportCubit>(
                 create: (context) => ReportCubit(context.read<RentalRepository>(), context.read<ToyRepository>()),
