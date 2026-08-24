@@ -58,6 +58,35 @@ class RentalRepository extends ChangeNotifier {
     ];
   }
 
+  /// Builds a new active `Rental` (same id scheme `AppState.submitNew`
+  /// always used — a microsecond timestamp — spec
+  /// 017-migracao-nova-locacao) and adds it. `startedAt` is always "now"
+  /// — a rental starts the moment it's created.
+  Rental addNew({
+    required String toyId,
+    required String childName,
+    required String guardianName,
+    required String guardianPhone,
+    required int? durationMin,
+    required double price,
+    required double? ratePerMinute,
+  }) {
+    final rental = Rental(
+      id: 'r${DateTime.now().microsecondsSinceEpoch}',
+      toyId: toyId,
+      childName: childName,
+      guardianName: guardianName,
+      guardianPhone: guardianPhone,
+      startedAt: DateTime.now(),
+      durationMin: durationMin,
+      price: price,
+      status: RentalStatus.active,
+      ratePerMinute: ratePerMinute,
+    );
+    add(rental);
+    return rental;
+  }
+
   void add(Rental rental) {
     rentals.add(rental);
     notifyListeners();

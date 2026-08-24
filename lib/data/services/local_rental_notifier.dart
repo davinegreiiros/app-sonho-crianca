@@ -3,7 +3,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
-import 'rental_notifier.dart';
+import '../../domain/rental_notifier.dart';
 
 /// Real [RentalNotifier]: `flutter_local_notifications`, local only — no
 /// server, no push, matching the app's offline baseline (spec

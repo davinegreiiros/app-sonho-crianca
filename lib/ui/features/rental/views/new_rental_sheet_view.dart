@@ -1,21 +1,26 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../state/app_state.dart';
-import '../test_keys.dart';
-import '../theme/app_colors.dart';
-import 'animations/pressable.dart';
-import 'animations/print_strip.dart';
+import '../../../../domain/formatters.dart';
+import '../../../../test_keys.dart';
+import '../../../../theme/app_colors.dart';
+import '../../../../widgets/animations/pressable.dart';
+import '../../../../widgets/animations/print_strip.dart';
+import '../view_models/new_rental_cubit.dart';
+import '../view_models/new_rental_state.dart';
 
 /// The "Nova locação" bottom sheet: toy picker, child/guardian fields,
 /// duration presets and price — ported from the design's `showNew` panel.
-class NewRentalSheet extends StatelessWidget {
-  const NewRentalSheet({super.key});
+///
+/// Migrated in spec 017-migracao-nova-locacao: reads/writes through
+/// [NewRentalCubit] instead of `AppState`.
+class NewRentalSheetView extends StatelessWidget {
+  const NewRentalSheetView({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
-    final draft = state.draft;
+    final cubit = context.watch<NewRentalCubit>();
+    final draft = cubit.state;
     final presets = const [5, 10, 30, 60];
 
     return DecoratedBox(
@@ -43,14 +48,14 @@ class NewRentalSheet extends StatelessWidget {
                   style: TextStyle(fontSize: 19, fontWeight: FontWeight.w600)),
               const SizedBox(height: 12),
               const _FieldLabel('Brinquedo'),
-              _Dropdown(state: state),
+              _Dropdown(cubit: cubit, draft: draft),
               const SizedBox(height: 12),
               const _FieldLabel('Nome da criança'),
               _TextInput(
                 key: TestKeys.draftChildNameField,
                 initial: draft.childName,
                 hint: 'Ex: Sofia',
-                onChanged: state.setDraftChild,
+                onChanged: cubit.setChildName,
               ),
               const SizedBox(height: 12),
               Row(
@@ -64,7 +69,7 @@ class NewRentalSheet extends StatelessWidget {
                           key: TestKeys.draftGuardianNameField,
                           initial: draft.guardianName,
                           hint: 'Nome do responsável',
-                          onChanged: state.setDraftGuardian,
+                          onChanged: cubit.setGuardianName,
                         ),
                       ],
                     ),
@@ -80,7 +85,7 @@ class NewRentalSheet extends StatelessWidget {
                           initial: draft.guardianPhone,
                           hint: '(85) 9 9999-9999',
                           keyboardType: TextInputType.phone,
-                          onChanged: state.setDraftPhone,
+                          onChanged: cubit.setGuardianPhone,
                         ),
                       ],
                     ),
@@ -98,7 +103,7 @@ class NewRentalSheet extends StatelessWidget {
                         key: TestKeys.rentalModeFixed,
                         label: 'Tempo fixo',
                         selected: !draft.openEnded,
-                        onTap: () => state.setDraftOpenEnded(false),
+                        onTap: () => cubit.setOpenEnded(false),
                       ),
                     ),
                   ),
@@ -109,7 +114,7 @@ class NewRentalSheet extends StatelessWidget {
                         key: TestKeys.rentalModeOpenEnded,
                         label: 'Tempo corrido',
                         selected: draft.openEnded,
-                        onTap: () => state.setDraftOpenEnded(true),
+                        onTap: () => cubit.setOpenEnded(true),
                       ),
                     ),
                   ),
@@ -118,9 +123,8 @@ class NewRentalSheet extends StatelessWidget {
               const SizedBox(height: 12),
               if (draft.openEnded) ...[
                 Builder(builder: (context) {
-                  final toy = state.toyById(draft.toyId);
-                  final suggested = state.ratePerMinute(toy);
-                  final effective = draft.customRatePerMinute ?? suggested;
+                  final suggested = draft.suggestedRatePerMinute;
+                  final effective = draft.effectiveRatePerMinute;
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -136,12 +140,12 @@ class NewRentalSheet extends StatelessWidget {
                             decimal: true),
                         onChanged: (v) {
                           final n = double.tryParse(v.replaceAll(',', '.'));
-                          if (n != null && n > 0) state.setDraftCustomRate(n);
+                          if (n != null && n > 0) cubit.setCustomRate(n);
                         },
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'sugestão do catálogo: ${state.fmtMoney(suggested)}/min',
+                        'sugestão do catálogo: ${formatMoney(suggested)}/min',
                         style: TextStyle(
                             fontSize: 11,
                             color: AppColors.text.withValues(alpha: 0.55)),
@@ -161,7 +165,7 @@ class NewRentalSheet extends StatelessWidget {
                           child: _PresetButton(
                             label: '${m}min',
                             selected: draft.durationMin == m,
-                            onTap: () => state.applyDuration(m),
+                            onTap: () => cubit.applyDuration(m),
                           ),
                         ),
                       ),
@@ -175,7 +179,7 @@ class NewRentalSheet extends StatelessWidget {
                   keyboardType: TextInputType.number,
                   onChanged: (v) {
                     final n = int.tryParse(v);
-                    if (n != null && n > 0) state.applyDuration(n);
+                    if (n != null && n > 0) cubit.applyDuration(n);
                   },
                 ),
                 const SizedBox(height: 12),
@@ -186,7 +190,7 @@ class NewRentalSheet extends StatelessWidget {
                   keyboardType: TextInputType.number,
                   onChanged: (v) {
                     final n = double.tryParse(v);
-                    if (n != null) state.setDraftPrice(n);
+                    if (n != null) cubit.setPrice(n);
                   },
                 ),
               ],
@@ -197,10 +201,7 @@ class NewRentalSheet extends StatelessWidget {
                     child: Pressable(
                       child: OutlinedButton(
                         key: TestKeys.cancelNewRentalButton,
-                        onPressed: () {
-                          state.closeNew();
-                          Navigator.of(context).pop();
-                        },
+                        onPressed: () => Navigator.of(context).pop(),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppColors.text,
                           side: BorderSide(
@@ -221,12 +222,12 @@ class NewRentalSheet extends StatelessWidget {
                     child: Pressable(
                       child: ElevatedButton(
                         key: TestKeys.submitNewRentalButton,
-                        onPressed: draft.childName.trim().isEmpty
-                            ? null
-                            : () {
-                                state.submitNew();
+                        onPressed: draft.canSubmit
+                            ? () {
+                                cubit.submit();
                                 Navigator.of(context).pop();
-                              },
+                              }
+                            : null,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.accent,
                           foregroundColor: AppColors.bg,
@@ -308,8 +309,9 @@ class _TextInput extends StatelessWidget {
 }
 
 class _Dropdown extends StatefulWidget {
-  const _Dropdown({required this.state});
-  final AppState state;
+  const _Dropdown({required this.cubit, required this.draft});
+  final NewRentalCubit cubit;
+  final NewRentalState draft;
 
   @override
   State<_Dropdown> createState() => _DropdownState();
@@ -333,7 +335,7 @@ class _DropdownState extends State<_Dropdown> {
 
   @override
   Widget build(BuildContext context) {
-    final state = widget.state;
+    final draft = widget.draft;
     return AnimatedContainer(
       duration: const Duration(milliseconds: 140),
       height: 38,
@@ -350,19 +352,19 @@ class _DropdownState extends State<_Dropdown> {
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           focusNode: _focus,
-          value: state.draft.toyId,
+          value: draft.toyId,
           isExpanded: true,
           style: const TextStyle(fontSize: 14, color: AppColors.text),
           items: [
-            for (final t in state.toys)
+            for (final t in draft.toys)
               DropdownMenuItem(
                 value: t.id,
-                child: Text('${t.name} — ${state.toyAvailable(t)} livre(s)',
+                child: Text('${t.name} — ${draft.availabilityOf(t)} livre(s)',
                     overflow: TextOverflow.ellipsis),
               ),
           ],
           onChanged: (v) {
-            if (v != null) state.setDraftToy(v);
+            if (v != null) widget.cubit.setToy(v);
           },
         ),
       ),

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../domain/formatters.dart';
 import '../../../../domain/models/rental.dart';
 import '../../../../domain/models/toy.dart';
 import '../../../../theme/app_colors.dart';
-import '../../../../ui/core/formatters.dart';
 import '../../../../widgets/animations/cascade.dart';
 import '../../../../widgets/animations/pressable.dart';
 import '../view_models/report_cubit.dart';

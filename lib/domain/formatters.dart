@@ -1,8 +1,10 @@
-// Pure, Flutter-independent display formatters shared across features
-// (spec 014-migracao-relatorio) — extracted out of `AppState`
-// (`fmtMoney`/`whenLabel`, unchanged behavior) so `ReportCubit` doesn't
-// duplicate them, and future Cubits (fatia 017+) can reuse them too
-// instead of re-deriving the same formatting.
+// Pure, Flutter-independent formatters shared across layers — extracted
+// out of `AppState` (`fmtMoney`/`whenLabel`, unchanged behavior, spec
+// 014-migracao-relatorio) so `ReportCubit` didn't have to duplicate them.
+// Lives in `lib/domain/` (not `lib/ui/core/`, where it started) since
+// spec 017-migracao-nova-locacao: `ScheduleRentalEndNotifications`, a
+// `domain/use_cases/` Use Case, needs `formatMoney` too, and the domain
+// layer can't import from `lib/ui/`.
 
 /// `R$ 12,50`-style money label — always 2 decimals, comma as the
 /// decimal separator (pt-BR).

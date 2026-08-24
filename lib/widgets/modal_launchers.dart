@@ -5,25 +5,24 @@ import '../state/app_state.dart';
 import '../theme/app_colors.dart';
 import '../ui/features/business_settings/views/business_settings_view.dart';
 import '../ui/features/catalog/views/add_toy_sheet_view.dart';
+import '../ui/features/rental/view_models/new_rental_cubit.dart';
+import '../ui/features/rental/views/new_rental_sheet_view.dart';
 import 'end_rental_dialog.dart';
-import 'new_rental_sheet.dart';
 
 /// Opens the "Nova locação" form as a real modal bottom sheet — slides up
 /// from the bottom with the framework's own transition, dims the
-/// backdrop. [AppState.showNew] stays as the source of truth for the
-/// form fields, but the sheet's presence is now an actual [ModalRoute]
-/// instead of a hand-rolled overlay.
+/// backdrop. [NewRentalCubit.open] resets the form's own draft (spec
+/// 017-migracao-nova-locacao — independent from `AppState.draft`, see
+/// `NewRentalState`'s doc for why).
 Future<void> showNewRentalSheet(BuildContext context) async {
-  final state = context.read<AppState>();
-  state.openNew();
+  context.read<NewRentalCubit>().open();
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     barrierColor: AppColors.text.withValues(alpha: 0.5),
-    builder: (context) => const NewRentalSheet(),
+    builder: (context) => const NewRentalSheetView(),
   );
-  state.closeNew();
 }
 
 /// Opens the "Finalizar locação" confirmation as a dialog that pops in

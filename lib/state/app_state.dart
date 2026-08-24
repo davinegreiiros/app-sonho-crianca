@@ -5,13 +5,13 @@ import '../data/repositories/business_settings_repository.dart';
 import '../data/repositories/rental_repository.dart';
 import '../data/repositories/toy_repository.dart';
 import '../data/services/local_rental_notifier.dart';
-import '../data/services/notification_texts.dart';
-import '../data/services/rental_notifier.dart';
+import '../domain/formatters.dart';
 import '../domain/models/business_settings.dart';
 import '../domain/models/rental.dart';
 import '../domain/models/toy.dart';
+import '../domain/rental_notifier.dart';
+import '../domain/use_cases/schedule_rental_end_notifications.dart';
 import '../theme/app_colors.dart';
-import '../ui/core/formatters.dart';
 
 enum AppTab { home, active, catalog, report }
 
@@ -309,21 +309,20 @@ class AppState extends ChangeNotifier {
   void submitNew() {
     final d = draft;
     if (d.childName.trim().isEmpty) return;
-    final rental = Rental(
-      id: 'r${DateTime.now().microsecondsSinceEpoch}',
+    // RentalRepository.addNew builds the Rental (id, startedAt, status) —
+    // spec 017-migracao-nova-locacao extracted that so NewRentalCubit
+    // doesn't duplicate it. Same fields, same id scheme as before.
+    final rental = _rentalRepository.addNew(
       toyId: d.toyId,
       childName: d.childName.trim(),
       guardianName: d.guardianName.trim().isEmpty ? '—' : d.guardianName.trim(),
       guardianPhone: d.guardianPhone.trim(),
-      startedAt: DateTime.now(),
       durationMin: d.openEnded ? null : d.durationMin,
       price: d.openEnded ? 0 : d.price,
-      status: RentalStatus.active,
       // Captured once, here — never re-derived from the toy later (see
       // the field's doc on `Rental`).
       ratePerMinute: d.openEnded ? (d.customRatePerMinute ?? ratePerMinute(toyById(d.toyId))) : null,
     );
-    _rentalRepository.add(rental);
     _scheduleEndNotification(rental);
     showNew = false;
     notifyListeners();
@@ -332,31 +331,13 @@ class AppState extends ChangeNotifier {
   /// Tempo corrido (spec 006) has no target end time to notify about —
   /// only a fixed-duration rental gets the two notifications below (spec
   /// 005 + spec 009): the "time's up" one, and a "5 minutes left"
-  /// heads-up before it.
+  /// heads-up before it. Delegates to [ScheduleRentalEndNotifications]
+  /// (spec 017-migracao-nova-locacao) so `NewRentalCubit` doesn't
+  /// duplicate this — same behavior as before, just extracted.
+  static const _scheduleRentalEndNotifications = ScheduleRentalEndNotifications();
+
   void _scheduleEndNotification(Rental rental) {
-    if (rental.isOpenEnded) return;
-    final toy = toyById(rental.toyId);
-    final endsAt = rental.startedAt.add(Duration(minutes: rental.durationMin!));
-
-    final (endTitle, endBody) = rentalEndedNotificationText(
-      childName: rental.childName,
-      toyName: toy.name,
-      durationMin: rental.durationMin!,
-      priceFormatted: fmtMoney(rental.price),
-    );
-    notifications.scheduleRentalEnd(rentalId: rental.id, title: endTitle, body: endBody, at: endsAt);
-
-    final (soonTitle, soonBody) = rentalEndingSoonNotificationText(
-      childName: rental.childName,
-      toyName: toy.name,
-      endsAt: endsAt,
-    );
-    notifications.scheduleRentalEndingSoon(
-      rentalId: rental.id,
-      title: soonTitle,
-      body: soonBody,
-      at: endsAt.subtract(const Duration(minutes: 5)),
-    );
+    _scheduleRentalEndNotifications(rental, toyById(rental.toyId), notifications);
   }
 
   /// Adds `addMinutes` to an active fixed-duration rental (spec 008): its
