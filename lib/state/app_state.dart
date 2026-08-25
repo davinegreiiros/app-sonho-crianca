@@ -12,8 +12,9 @@ import '../domain/models/toy.dart';
 import '../domain/rental_notifier.dart';
 import '../domain/use_cases/schedule_rental_end_notifications.dart';
 import '../theme/app_colors.dart';
+import '../ui/features/app_shell/view_models/app_shell_state.dart';
 
-enum AppTab { home, active, catalog, report }
+export '../ui/features/app_shell/view_models/app_shell_state.dart' show AppTab;
 
 /// Draft form state for the "Nova locação" sheet.
 class RentalDraft {

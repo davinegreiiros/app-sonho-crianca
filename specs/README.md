@@ -44,5 +44,6 @@ Sem `spec.md` aprovado, sem código de feature. Bugfix simples e chore não prec
 | [018](018-migracao-locacao-ativa-encerrar/spec.md) | Migração: Locação ativa, estender, cancelar, encerrar + Pix | Implemented | 017 |
 | [019](019-migracao-painel-home/spec.md) | Migração: Painel do dia (Home) | Implemented | 018 |
 | [020](020-persistencia-local/spec.md) | Persistência local (SQLite) — Toy/Rental sobrevivem a restart | Implemented | 019 |
+| [021](021-migracao-shell-app/spec.md) | Migração: Shell do app (tab ativa, cabeçalho, nav) | Implemented | 019 |
 
 Todas em `Draft` — cada uma tem "Dúvidas em aberto" que precisa de resposta sua antes de virar `Approved` e ganhar `plan.md`/`tasks.md`.

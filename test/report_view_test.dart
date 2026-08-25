@@ -4,25 +4,27 @@
 // updates what's on screen.
 
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:sonho_de_crianca/data/repositories/rental_repository.dart';
 import 'package:sonho_de_crianca/main.dart';
-import 'package:sonho_de_crianca/state/app_state.dart';
+import 'package:sonho_de_crianca/ui/features/app_shell/view_models/app_shell_cubit.dart';
+import 'package:sonho_de_crianca/ui/features/app_shell/view_models/app_shell_state.dart';
 
-Future<AppState> _pumpApp(WidgetTester tester) async {
+Future<void> _pumpApp(WidgetTester tester) async {
   // Totals asserted below come from the demo seed (h1/h2/h3 finished
   // today) — spec 020-persistencia-local: the real app's default
   // RentalRepository starts empty, so this test asks for the seed
   // explicitly.
   await tester.pumpWidget(SonhoDeCriancaApp(rentalRepository: RentalRepository.withDemoSeed()));
   await tester.pump(const Duration(milliseconds: 400));
-  final state = Provider.of<AppState>(tester.element(find.byType(MaterialApp)), listen: false);
-  state.setTab(AppTab.report);
+  // Navigation lives in AppShellCubit (spec 021-migracao-shell-app), not
+  // AppState, since home_shell.dart/app_bottom_nav.dart/app_header.dart
+  // stopped reading AppState.
+  BlocProvider.of<AppShellCubit>(tester.element(find.byType(MaterialApp)), listen: false).setTab(AppTab.report);
   await tester.pump(const Duration(milliseconds: 400));
-  return state;
 }
 
 void main() {

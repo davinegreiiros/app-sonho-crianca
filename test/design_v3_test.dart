@@ -3,6 +3,7 @@
 // instead of a bottom sheet.
 
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -12,6 +13,7 @@ import 'package:sonho_de_crianca/main.dart';
 import 'package:sonho_de_crianca/domain/models/toy.dart';
 import 'package:sonho_de_crianca/state/app_state.dart';
 import 'package:sonho_de_crianca/test_keys.dart';
+import 'package:sonho_de_crianca/ui/features/app_shell/view_models/app_shell_cubit.dart';
 import 'package:sonho_de_crianca/widgets/category_icon.dart';
 
 Future<AppState> _pumpApp(WidgetTester tester, {RentalRepository? rentalRepository}) async {
@@ -20,12 +22,18 @@ Future<AppState> _pumpApp(WidgetTester tester, {RentalRepository? rentalReposito
   return Provider.of<AppState>(tester.element(find.byType(MaterialApp)), listen: false);
 }
 
+// Navigation lives in AppShellCubit (spec 021-migracao-shell-app), not
+// AppState, since home_shell.dart stopped reading AppState.
+void _setTab(WidgetTester tester, AppTab tab) {
+  BlocProvider.of<AppShellCubit>(tester.element(find.byType(MaterialApp)), listen: false).setTab(tab);
+}
+
 void main() {
   SharedPreferences.setMockInitialValues({});
 
   testWidgets('catalog card shows the right category icon', (tester) async {
-    final state = await _pumpApp(tester);
-    state.setTab(AppTab.catalog);
+    await _pumpApp(tester);
+    _setTab(tester, AppTab.catalog);
     await tester.pump(const Duration(milliseconds: 400));
 
     // Seed: 'carrinho' is ToyCategory.eletrico.
@@ -44,7 +52,7 @@ void main() {
     state.submitNew();
     final openEnded = state.rentals.firstWhere((r) => r.childName == 'Tempo Corrido Teste');
 
-    state.setTab(AppTab.active);
+    _setTab(tester, AppTab.active);
     await tester.pump(const Duration(milliseconds: 400));
 
     final openEndedCard = find.byKey(TestKeys.activeCardKey(openEnded.id));

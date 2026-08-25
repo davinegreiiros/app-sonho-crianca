@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../state/app_state.dart';
 import '../test_keys.dart';
 import '../theme/app_colors.dart';
+import '../ui/features/app_shell/view_models/app_shell_cubit.dart';
+import '../ui/features/app_shell/view_models/app_shell_state.dart';
 import '../ui/features/catalog/views/catalog_view.dart';
 import '../ui/features/home/views/home_view.dart';
 import '../ui/features/rental/views/active_tab_view.dart';
@@ -22,7 +23,7 @@ class HomeShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tab = context.select((AppState s) => s.tab);
+    final tab = context.select((AppShellCubit c) => c.state.tab);
 
     return Scaffold(
       backgroundColor: AppColors.bg,

@@ -11,6 +11,7 @@ import 'data/services/toy_local_service.dart';
 import 'screens/home_shell.dart';
 import 'state/app_state.dart';
 import 'theme/app_theme.dart';
+import 'ui/features/app_shell/view_models/app_shell_cubit.dart';
 import 'ui/features/business_settings/view_models/business_settings_cubit.dart';
 import 'ui/features/catalog/view_models/toy_catalog_cubit.dart';
 import 'ui/features/home/view_models/home_cubit.dart';
@@ -93,6 +94,9 @@ class SonhoDeCriancaApp extends StatelessWidget {
         builder: (context) {
           return MultiBlocProvider(
             providers: [
+              BlocProvider<AppShellCubit>(
+                create: (context) => AppShellCubit(),
+              ),
               BlocProvider<BusinessSettingsCubit>(
                 create: (context) => BusinessSettingsCubit(context.read<BusinessSettingsRepository>()),
               ),

@@ -15,6 +15,7 @@ import 'package:sonho_de_crianca/domain/models/toy.dart';
 import 'package:sonho_de_crianca/state/app_state.dart';
 import 'package:sonho_de_crianca/test_keys.dart';
 import 'package:sonho_de_crianca/theme/app_colors.dart';
+import 'package:sonho_de_crianca/ui/features/app_shell/view_models/app_shell_cubit.dart';
 import 'package:sonho_de_crianca/ui/features/catalog/view_models/toy_catalog_cubit.dart';
 import 'package:sonho_de_crianca/ui/features/catalog/views/add_toy_sheet_view.dart';
 
@@ -31,7 +32,9 @@ Future<AppState> _pumpApp(WidgetTester tester, {RentalRepository? rentalReposito
   await tester.pumpWidget(SonhoDeCriancaApp(rentalRepository: rentalRepository));
   await tester.pump(const Duration(milliseconds: 400));
   final state = Provider.of<AppState>(tester.element(find.byType(MaterialApp)), listen: false);
-  state.setTab(AppTab.catalog);
+  // Navigation lives in AppShellCubit (spec 021-migracao-shell-app), not
+  // AppState, since home_shell.dart stopped reading AppState.
+  BlocProvider.of<AppShellCubit>(tester.element(find.byType(MaterialApp)), listen: false).setTab(AppTab.catalog);
   await tester.pump(const Duration(milliseconds: 400));
   return state;
 }

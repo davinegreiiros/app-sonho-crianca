@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../state/app_state.dart';
 import '../test_keys.dart';
 import '../theme/app_colors.dart';
+import '../ui/features/app_shell/view_models/app_shell_cubit.dart';
+import '../ui/features/app_shell/view_models/app_shell_state.dart';
 import 'animations/pressable.dart';
 
 /// Custom 4-tab bar: pill-highlighted active tab, matching the design's
@@ -20,7 +21,7 @@ class AppBottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
+    final state = context.watch<AppShellCubit>().state;
     return DecoratedBox(
       decoration: BoxDecoration(
         color: AppColors.bg,
@@ -40,7 +41,7 @@ class AppBottomNav extends StatelessWidget {
                       icon: item.icon,
                       label: item.label,
                       active: state.tab == item.tab,
-                      onTap: () => state.setTab(item.tab),
+                      onTap: () => context.read<AppShellCubit>().setTab(item.tab),
                     ),
                   ),
                 ),
