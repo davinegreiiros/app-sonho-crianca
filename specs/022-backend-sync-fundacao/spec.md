@@ -1,6 +1,6 @@
 # Spec: Backend + sync entre aparelhos — fundação (spec guarda-chuva)
 
-Status: Approved
+Status: Implemented
 Criado: 2026-08-25
 Dono: análise de segurança (mesmo tratamento da spec 002 — dado sai do aparelho pela primeira vez)
 
