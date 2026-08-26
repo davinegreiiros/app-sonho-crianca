@@ -22,8 +22,8 @@ Toda feature nova que toque em dado de criança/responsável, dinheiro ou permis
 
 ## Fora de escopo
 
-- Autenticação de usuário / multi-usuário (app hoje é single-device, single-operador — não pedido).
-- Backend, sync em nuvem, API remota — não existe e nenhuma spec atual pede isso. Se aparecer, é nova spec de segurança dedicada, não extensão desta.
+- ~~Autenticação de usuário / multi-usuário (app hoje é single-device, single-operador — não pedido).~~ **Superado em 2026-08-25**: spec [022-backend-sync-fundacao](../022-backend-sync-fundacao/spec.md) introduz auth por operador (multi-aparelho, multi-operador, cada ação com autoria registrada).
+- ~~Backend, sync em nuvem, API remota — não existe e nenhuma spec atual pede isso. Se aparecer, é nova spec de segurança dedicada, não extensão desta.~~ **Superado em 2026-08-25**: a spec dedicada é a [022-backend-sync-fundacao](../022-backend-sync-fundacao/spec.md).
 - Compliance formal (LGPD como processo jurídico) — aqui é engenharia: minimizar coleta, minimizar exposição, minimizar retenção. Não substitui parecer jurídico se o negócio crescer.
 
 ## Modelo de ameaça (resumo)
@@ -72,4 +72,4 @@ Toda feature nova que toque em dado de criança/responsável, dinheiro ou permis
 ## Dúvidas em aberto
 
 - Chave Pix: vai ter uma tela de "configurações do negócio" pra cadastrar (nome do recebedor, cidade, chave Pix)? Isso não existe hoje no app — precisa entrar no escopo de `004`.
-- Se algum dia este app rodar em tablet compartilhado na loja (múltiplos operadores no mesmo aparelho), isso muda o requisito de retenção — hoje assumo single-operador.
+- ~~Se algum dia este app rodar em tablet compartilhado na loja (múltiplos operadores no mesmo aparelho), isso muda o requisito de retenção — hoje assumo single-operador.~~ **Respondido em 2026-08-25** pela spec 022: multi-operador é o cenário real (login por operador, não por aparelho/negócio).

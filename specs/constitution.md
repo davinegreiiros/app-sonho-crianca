@@ -47,10 +47,11 @@ Nada pode quebrar em hipótese nenhuma. Se a implementação de uma spec introdu
 
 ## Segurança (baseline)
 
-App é 100% local hoje: sem `INTERNET` permission, sem backend. Dado de catálogo/locação persiste em disco (SQLite via `sqflite`, sandbox do app — spec 020-persistencia-local); `BusinessSettings` persiste via `SharedPreferences`. Persistência local (sem sair do aparelho) é o piso a manter por padrão — qualquer spec que:
+App era 100% local até a spec [022-backend-sync-fundacao](022-backend-sync-fundacao/spec.md) (2026-08-25): a partir dela, dado passa a sair do aparelho pra um backend próprio (Next.js + MongoDB, repositório [sonho-de-crianca-backend](../../sonho-de-crianca-backend)), autenticado por operador (não mais "single-operador" — cada ação grava quem fez). Isso muda o piso de segurança que valia antes — ver o "Modelo de ameaça" da 022 pra lista completa, resumo abaixo. Dado de catálogo/locação continua também em SQLite local (`sqflite`, spec 020-persistencia-local) e `BusinessSettings` também em `SharedPreferences` **enquanto a fatia que troca pra HTTP não for implementada** (specs 023+) — v1 do backend é online-only (decisão registrada na 022), sem fila offline.
 
 - Adicione permissão nova (Android `AndroidManifest.xml` / iOS `Info.plist`) precisa justificar no `plan.md` por que é mínima e necessária.
 - Adicione persistência de dado pessoal (nome de criança, nome/telefone de responsável) precisa endereçar em `spec.md` onde o dado fica, por quanto tempo, e se é sensível o bastante pra precisar de criptografia em repouso.
-- Envie qualquer dado pra fora do dispositivo (rede, analytics, crash reporting) é tratada como mudança de alto risco — exige revisão de segurança dedicada antes do `plan.md`, ver [specs/002-seguranca-dados/spec.md](002-seguranca-dados/spec.md).
+- Envie qualquer dado pra fora do dispositivo (rede, analytics, crash reporting) é tratada como mudança de alto risco — exige revisão de segurança dedicada antes do `plan.md`. A dedicada pra "backend/rede" já existe ([specs/002-seguranca-dados/spec.md](002-seguranca-dados/spec.md) + [022-backend-sync-fundacao](022-backend-sync-fundacao/spec.md)) — qualquer spec nova que mexer nisso referencia as duas, não reabre a decisão.
+- Nenhuma chamada ao backend sem TLS. Nenhum JWT/senha de operador em log ou `print`/`debugPrint`.
 
 Regra geral: dado de criança/responsável nunca trafega pra fora do aparelho sem essa revisão explícita, e nunca aparece em log.
