@@ -1,18 +1,20 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
-import '../models/business_settings.dart';
-import '../models/rental.dart';
-import '../models/toy.dart';
-import '../notifications/local_rental_notifier.dart';
-import '../notifications/notification_texts.dart';
-import '../notifications/rental_notifier.dart';
+import '../data/repositories/business_settings_repository.dart';
+import '../data/repositories/rental_repository.dart';
+import '../data/repositories/toy_repository.dart';
+import '../data/services/local_rental_notifier.dart';
+import '../domain/formatters.dart';
+import '../domain/models/business_settings.dart';
+import '../domain/models/rental.dart';
+import '../domain/models/toy.dart';
+import '../domain/rental_notifier.dart';
+import '../domain/use_cases/schedule_rental_end_notifications.dart';
 import '../theme/app_colors.dart';
+import '../ui/features/app_shell/view_models/app_shell_state.dart';
 
-enum AppTab { home, active, catalog, report }
-
-enum ReportPeriod { today, week, all }
+export '../ui/features/app_shell/view_models/app_shell_state.dart' show AppTab;
 
 /// Draft form state for the "Nova locação" sheet.
 class RentalDraft {
@@ -50,10 +52,42 @@ class RentalDraft {
 /// end-rental flow, and the report period filter. A 1s ticker keeps active
 /// rental countdowns live.
 class AppState extends ChangeNotifier {
-  AppState({RentalNotifier? notifications}) : notifications = notifications ?? LocalRentalNotifier() {
-    _seed();
+  AppState({
+    RentalNotifier? notifications,
+    BusinessSettingsRepository? businessSettingsRepository,
+    ToyRepository? toyRepository,
+    RentalRepository? rentalRepository,
+  })  : notifications = notifications ?? LocalRentalNotifier(),
+        _businessSettingsRepository = businessSettingsRepository ?? BusinessSettingsRepository(),
+        _ownsBusinessSettingsRepository = businessSettingsRepository == null,
+        _toyRepository = toyRepository ?? ToyRepository(),
+        _ownsToyRepository = toyRepository == null,
+        _rentalRepository = rentalRepository ?? RentalRepository(),
+        _ownsRentalRepository = rentalRepository == null {
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) => notifyListeners());
-    _loadBusinessSettings();
+    // BusinessSettings ownership moved to BusinessSettingsRepository (spec
+    // 011-migracao-configuracoes-negocio) — AppState only relays its
+    // changes so end_rental_dialog.dart/pix_qr_sheet.dart (not migrated
+    // yet, fatia 017+) keep working unchanged off `businessSettings` below.
+    // `load()` (dos 3 Repositories) não é mais disparado daqui (spec
+    // 020-persistencia-local) — vira responsabilidade explícita de
+    // `main.dart`, aguardado antes do primeiro frame (sem isso, o boot
+    // "piscaria" Catálogo/Painel vazios até o load assíncrono resolver).
+    _businessSettingsRepository.addListener(notifyListeners);
+    // Toy ownership moved to ToyRepository (spec
+    // 012-migracao-catalogo-criacao) — same relay pattern, needed by
+    // every other tab/sheet that reads `toys`/`toyById` and hasn't
+    // migrated yet. ToyRepository seeds itself synchronously (no
+    // SharedPreferences involved), so `_seed()` below can rely on `toys`
+    // already being populated.
+    _toyRepository.addListener(notifyListeners);
+    // Rental ownership moved to RentalRepository (spec
+    // 013-migracao-rental-repository-fundacao) — same relay pattern.
+    // RentalRepository seeds itself synchronously, so `_seed()` below
+    // (which only sets up `draft` now) can rely on `rentals` already
+    // being populated.
+    _rentalRepository.addListener(notifyListeners);
+    _seed();
     // Permission asked right at boot, not lazily on first rental (spec
     // 005 amendment, 2026-08-22, product owner decision) — fire-and-forget:
     // `init()` is idempotent and swallows its own errors (see
@@ -66,58 +100,51 @@ class AppState extends ChangeNotifier {
   /// instead of hitting a real platform channel — see `RentalNotifier`.
   final RentalNotifier notifications;
 
-  static const _prefsMerchantName = 'business_merchant_name';
-  static const _prefsMerchantCity = 'business_merchant_city';
-  static const _prefsPixKey = 'business_pix_key';
+  /// Single source of truth for `BusinessSettings` (spec
+  /// 011-migracao-configuracoes-negocio) — shared with
+  /// `BusinessSettingsCubit` in production (wired in `main.dart`); tests
+  /// that don't pass one get their own default instance, same pattern as
+  /// [notifications]/`LocalRentalNotifier`.
+  final BusinessSettingsRepository _businessSettingsRepository;
 
-  BusinessSettings businessSettings = const BusinessSettings();
+  /// Whether this `AppState` created its own default
+  /// [_businessSettingsRepository] (no shared instance was injected) —
+  /// only then does [dispose] also dispose the repository; a shared
+  /// instance (e.g. wired in `main.dart` alongside `BusinessSettingsCubit`)
+  /// outlives any single `AppState` and is disposed by whoever created it.
+  final bool _ownsBusinessSettingsRepository;
 
-  /// Set by [dispose]. [_loadBusinessSettings]'s `await` can resolve after
-  /// this `AppState` is already gone (e.g. a test builds one, asserts, and
-  /// disposes it before `SharedPreferences.getInstance()` gets back) —
-  /// `notifyListeners()` on a disposed `ChangeNotifier` throws, so every
-  /// callback that survives an `await` checks this first.
-  bool _disposed = false;
+  /// Single source of truth for the toy catalog (spec
+  /// 012-migracao-catalogo-criacao) — shared with `ToyCatalogCubit` in
+  /// production (wired in `main.dart`); same opt-in pattern as
+  /// [_businessSettingsRepository].
+  final ToyRepository _toyRepository;
+  final bool _ownsToyRepository;
 
-  /// Loads the persisted Pix/business config, if any, from local device
-  /// storage (spec 004-pix-qrcode) — never from the network, never
-  /// bundled with the app. Starts with empty defaults and notifies once
-  /// this resolves, same pattern as any other async-at-boot state.
-  Future<void> _loadBusinessSettings() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (_disposed) return;
-    businessSettings = BusinessSettings(
-      merchantName: prefs.getString(_prefsMerchantName) ?? '',
-      merchantCity: prefs.getString(_prefsMerchantCity) ?? '',
-      pixKey: prefs.getString(_prefsPixKey) ?? '',
-    );
-    notifyListeners();
-  }
+  /// Single source of truth for the rental list (spec
+  /// 013-migracao-rental-repository-fundacao) — foundation only, no Cubit
+  /// consumes it yet (that starts at fatia 014). Same opt-in pattern as
+  /// [_businessSettingsRepository]/[_toyRepository].
+  final RentalRepository _rentalRepository;
+  final bool _ownsRentalRepository;
+
+  BusinessSettings get businessSettings => _businessSettingsRepository.settings;
 
   Future<void> updateBusinessSettings({
     required String merchantName,
     required String merchantCity,
     required String pixKey,
-  }) async {
-    businessSettings = BusinessSettings(merchantName: merchantName, merchantCity: merchantCity, pixKey: pixKey);
-    notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    if (_disposed) return;
-    await prefs.setString(_prefsMerchantName, merchantName);
-    await prefs.setString(_prefsMerchantCity, merchantCity);
-    await prefs.setString(_prefsPixKey, pixKey);
+  }) {
+    return _businessSettingsRepository.update(
+      BusinessSettings(merchantName: merchantName, merchantCity: merchantCity, pixKey: pixKey),
+    );
   }
-
-  // ---- config (design-time props in the original, fixed defaults here) ----
-  static const Color _alertColor = AppColors.statusUrgent;
-  static const bool _pulseOnOvertime = true;
-  static const int _reportWindowDays = 14;
 
   late final Timer _ticker;
 
   AppTab tab = AppTab.home;
-  List<Toy> toys = [];
-  List<Rental> rentals = [];
+  List<Toy> get toys => _toyRepository.toys;
+  List<Rental> get rentals => _rentalRepository.rentals;
 
   bool showNew = false;
   late RentalDraft draft;
@@ -140,43 +167,24 @@ class AppState extends ChangeNotifier {
   /// there and then, no QR-wait window to freeze against).
   double? endFrozenPrice;
 
-  ReportPeriod reportPeriod = ReportPeriod.today;
-
   void _seed() {
-    toys = kInitialToys.map((t) => t).toList();
-
-    DateTime minAgo(num n) => DateTime.now().subtract(Duration(seconds: (n * 60).round()));
-    DateTime dAgo(num n) => DateTime.now().subtract(Duration(seconds: (n * 86400).round()));
-    DateTime todayAt(int h) {
-      final now = DateTime.now();
-      final start = DateTime(now.year, now.month, now.day);
-      final at = start.add(Duration(hours: h));
-      final cap = now.subtract(const Duration(minutes: 5));
-      return at.isBefore(cap) ? at : cap;
-    }
-
-    rentals = [
-      Rental(id: 'a1', toyId: 'carrinho', childName: 'Sofia', guardianName: 'Camila Ramos', guardianPhone: '(85) 98888-1010', startedAt: minAgo(9), durationMin: 15, price: 10, status: RentalStatus.active),
-      Rental(id: 'a2', toyId: 'pula', childName: 'Enzo', guardianName: 'Marcos Lima', guardianPhone: '(85) 99999-2020', startedAt: minAgo(32), durationMin: 30, price: 12, status: RentalStatus.active),
-      Rental(id: 'a3', toyId: 'patinete', childName: 'Lívia', guardianName: 'Ana Souza', guardianPhone: '(85) 98777-3030', startedAt: minAgo(3), durationMin: 15, price: 12, status: RentalStatus.active),
-      Rental(id: 'h1', toyId: 'carrinho', childName: 'Davi', guardianName: 'Renata Alves', startedAt: todayAt(9).subtract(const Duration(minutes: 15)), durationMin: 15, price: 10, status: RentalStatus.done, endedAt: todayAt(9), paymentMethod: PaymentMethod.pix),
-      Rental(id: 'h2', toyId: 'cama', childName: 'Manuela', guardianName: 'Bruno Costa', startedAt: todayAt(10).subtract(const Duration(minutes: 30)), durationMin: 30, price: 15, status: RentalStatus.done, endedAt: todayAt(10), paymentMethod: PaymentMethod.dinheiro),
-      Rental(id: 'h3', toyId: 'piscina', childName: 'Théo', guardianName: 'Juliana Dias', startedAt: todayAt(11).subtract(const Duration(minutes: 20)), durationMin: 20, price: 10, status: RentalStatus.done, endedAt: todayAt(11), paymentMethod: PaymentMethod.cartao),
-      Rental(id: 'h4', toyId: 'pula', childName: 'Alice', guardianName: 'Paulo Nunes', startedAt: dAgo(1), durationMin: 30, price: 24, status: RentalStatus.done, endedAt: dAgo(1).add(const Duration(minutes: 30)), paymentMethod: PaymentMethod.pix),
-      Rental(id: 'h5', toyId: 'patinete', childName: 'Gabriel', guardianName: 'Carla Mota', startedAt: dAgo(1.2), durationMin: 15, price: 12, status: RentalStatus.done, endedAt: dAgo(1.2).add(const Duration(minutes: 15)), paymentMethod: PaymentMethod.dinheiro),
-      Rental(id: 'h6', toyId: 'carrinho', childName: 'Isabela', guardianName: 'Fábio Reis', startedAt: dAgo(2), durationMin: 15, price: 10, status: RentalStatus.done, endedAt: dAgo(2).add(const Duration(minutes: 15)), paymentMethod: PaymentMethod.cartao),
-      Rental(id: 'h7', toyId: 'cama', childName: 'Miguel', guardianName: 'Larissa Pinto', startedAt: dAgo(3.4), durationMin: 30, price: 15, status: RentalStatus.done, endedAt: dAgo(3.4).add(const Duration(minutes: 30)), paymentMethod: PaymentMethod.pix),
-      Rental(id: 'h8', toyId: 'piscina', childName: 'Helena', guardianName: 'Diego Farias', startedAt: dAgo(5.5), durationMin: 20, price: 10, status: RentalStatus.done, endedAt: dAgo(5.5).add(const Duration(minutes: 20)), paymentMethod: PaymentMethod.pix),
-    ];
-
+    // Toys are seeded by ToyRepository, rentals by RentalRepository
+    // (specs 012/013) — nothing to do here anymore beyond the draft,
+    // which depends on both being already populated (see the
+    // repository-listener setup above, run before this call).
     final first = toys.firstWhere((t) => toyAvailable(t) > 0, orElse: () => toys.first);
     draft = RentalDraft(toyId: first.id, durationMin: first.blockMin, price: first.price);
   }
 
   @override
   void dispose() {
-    _disposed = true;
     _ticker.cancel();
+    _businessSettingsRepository.removeListener(notifyListeners);
+    if (_ownsBusinessSettingsRepository) _businessSettingsRepository.dispose();
+    _toyRepository.removeListener(notifyListeners);
+    if (_ownsToyRepository) _toyRepository.dispose();
+    _rentalRepository.removeListener(notifyListeners);
+    if (_ownsRentalRepository) _rentalRepository.dispose();
     super.dispose();
   }
 
@@ -184,30 +192,10 @@ class AppState extends ChangeNotifier {
 
   Toy toyById(String id) => toys.firstWhere((t) => t.id == id, orElse: () => toys.first);
 
-  String fmtMoney(double v) => 'R\$ ${v.toStringAsFixed(2).replaceAll('.', ',')}';
+  String fmtMoney(double v) => formatMoney(v);
 
-  Color statusColor(double ratio, bool overtime) {
-    if (overtime || ratio <= 0.2) return _alertColor;
-    if (ratio <= 0.5) return AppColors.statusWarn;
-    return AppColors.statusOk;
-  }
 
-  String fmtClock(double remainMin) {
-    final overtime = remainMin < 0;
-    final abs = remainMin.abs();
-    final mm = abs.floor();
-    final ss = ((abs - mm) * 60).round();
-    String pad(int n) => n.toString().padLeft(2, '0');
-    return '${overtime ? '+' : ''}${pad(mm)}:${pad(ss)}';
-  }
-
-  String whenLabel(DateTime ts) {
-    final min = DateTime.now().difference(ts).inSeconds / 60;
-    if (min < 60) return 'há ${(min < 1 ? 1 : min.round())} min';
-    final h = min / 60;
-    if (h < 24) return 'há ${h.round()}h';
-    return 'há ${(h / 24).round()}d';
-  }
+  String whenLabel(DateTime ts) => formatRelativeTime(ts);
 
   int toyAvailable(Toy t) {
     final rented = rentals.where((r) => r.status == RentalStatus.active && r.toyId == t.id).length;
@@ -307,21 +295,20 @@ class AppState extends ChangeNotifier {
   void submitNew() {
     final d = draft;
     if (d.childName.trim().isEmpty) return;
-    final rental = Rental(
-      id: 'r${DateTime.now().microsecondsSinceEpoch}',
+    // RentalRepository.addNew builds the Rental (id, startedAt, status) —
+    // spec 017-migracao-nova-locacao extracted that so NewRentalCubit
+    // doesn't duplicate it. Same fields, same id scheme as before.
+    final rental = _rentalRepository.addNew(
       toyId: d.toyId,
       childName: d.childName.trim(),
       guardianName: d.guardianName.trim().isEmpty ? '—' : d.guardianName.trim(),
       guardianPhone: d.guardianPhone.trim(),
-      startedAt: DateTime.now(),
       durationMin: d.openEnded ? null : d.durationMin,
       price: d.openEnded ? 0 : d.price,
-      status: RentalStatus.active,
       // Captured once, here — never re-derived from the toy later (see
       // the field's doc on `Rental`).
       ratePerMinute: d.openEnded ? (d.customRatePerMinute ?? ratePerMinute(toyById(d.toyId))) : null,
     );
-    rentals.add(rental);
     _scheduleEndNotification(rental);
     showNew = false;
     notifyListeners();
@@ -330,31 +317,13 @@ class AppState extends ChangeNotifier {
   /// Tempo corrido (spec 006) has no target end time to notify about —
   /// only a fixed-duration rental gets the two notifications below (spec
   /// 005 + spec 009): the "time's up" one, and a "5 minutes left"
-  /// heads-up before it.
+  /// heads-up before it. Delegates to [ScheduleRentalEndNotifications]
+  /// (spec 017-migracao-nova-locacao) so `NewRentalCubit` doesn't
+  /// duplicate this — same behavior as before, just extracted.
+  static const _scheduleRentalEndNotifications = ScheduleRentalEndNotifications();
+
   void _scheduleEndNotification(Rental rental) {
-    if (rental.isOpenEnded) return;
-    final toy = toyById(rental.toyId);
-    final endsAt = rental.startedAt.add(Duration(minutes: rental.durationMin!));
-
-    final (endTitle, endBody) = rentalEndedNotificationText(
-      childName: rental.childName,
-      toyName: toy.name,
-      durationMin: rental.durationMin!,
-      priceFormatted: fmtMoney(rental.price),
-    );
-    notifications.scheduleRentalEnd(rentalId: rental.id, title: endTitle, body: endBody, at: endsAt);
-
-    final (soonTitle, soonBody) = rentalEndingSoonNotificationText(
-      childName: rental.childName,
-      toyName: toy.name,
-      endsAt: endsAt,
-    );
-    notifications.scheduleRentalEndingSoon(
-      rentalId: rental.id,
-      title: soonTitle,
-      body: soonBody,
-      at: endsAt.subtract(const Duration(minutes: 5)),
-    );
+    _scheduleRentalEndNotifications(rental, toyById(rental.toyId), notifications);
   }
 
   /// Adds `addMinutes` to an active fixed-duration rental (spec 008): its
@@ -366,20 +335,23 @@ class AppState extends ChangeNotifier {
   void extendActive(String rentalId, int addMinutes) {
     final r = rentals.firstWhere((r) => r.id == rentalId, orElse: () => rentals.first);
     if (r.isOpenEnded) return;
-    r.durationMin = r.durationMin! + addMinutes;
     final rate = r.ratePerMinute ?? ratePerMinute(toyById(r.toyId));
-    r.price = ((r.price + rate * addMinutes) * 100).round() / 100;
+    final newDuration = r.durationMin! + addMinutes;
+    final newPrice = ((r.price + rate * addMinutes) * 100).round() / 100;
+    // RentalRepository.extend mutates + notifies (spec
+    // 018-migracao-locacao-ativa-encerrar) — before this, mutating `r`
+    // directly here never told RentalRepository's other listeners
+    // (ReportCubit/ToyCatalogCubit) that anything changed.
+    _rentalRepository.extend(rentalId, durationMin: newDuration, price: newPrice);
     notifications.cancelRentalEnd(r.id);
     notifications.cancelRentalEndingSoon(r.id);
     _scheduleEndNotification(r);
-    notifyListeners();
   }
 
   void cancelActive(String id) {
     notifications.cancelRentalEnd(id);
     notifications.cancelRentalEndingSoon(id);
-    rentals.removeWhere((r) => r.id == id);
-    notifyListeners();
+    _rentalRepository.removeById(id);
   }
 
   void openEnd(String id) {
@@ -435,28 +407,22 @@ class AppState extends ChangeNotifier {
     // one — never recompute a tempo-corrido price after the QR was
     // already shown, or the amount charged could exceed what the
     // customer's bank app actually scanned.
-    if (r.isOpenEnded) r.price = endFrozenPrice ?? computeFinalPrice(r);
-    r.finish(endPayment!);
+    // RentalRepository.finish mutates + notifies (spec
+    // 018-migracao-locacao-ativa-encerrar — same fix as extendActive).
+    _rentalRepository.finish(
+      r.id,
+      endPayment!,
+      finalPrice: r.isOpenEnded ? (endFrozenPrice ?? computeFinalPrice(r)) : null,
+    );
     endingId = null;
     endPayment = null;
     endFrozenPrice = null;
     notifyListeners();
   }
 
-  void setReportPeriod(ReportPeriod p) {
-    reportPeriod = p;
-    notifyListeners();
-  }
+  void updateToyPrice(String id, double v) => _toyRepository.updatePrice(id, v);
 
-  void updateToyPrice(String id, double v) {
-    toys = toys.map((t) => t.id == id ? t.copyWith(price: v) : t).toList();
-    notifyListeners();
-  }
-
-  void updateToyBlock(String id, int v) {
-    toys = toys.map((t) => t.id == id ? t.copyWith(blockMin: v) : t).toList();
-    notifyListeners();
-  }
+  void updateToyBlock(String id, int v) => _toyRepository.updateBlockMinutes(id, v);
 
   void addToy({
     required String name,
@@ -467,12 +433,15 @@ class AppState extends ChangeNotifier {
     required ToyCategory category,
     int qty = 1,
   }) {
-    final id = 'custom_${DateTime.now().microsecondsSinceEpoch}';
-    toys = [
-      ...toys,
-      Toy(id: id, name: name, qty: qty, blockMin: blockMin, price: price, ink: ink, imageKey: imageKey, category: category),
-    ];
-    notifyListeners();
+    _toyRepository.addNew(
+      name: name,
+      price: price,
+      blockMin: blockMin,
+      ink: ink,
+      imageKey: imageKey,
+      category: category,
+      qty: qty,
+    );
   }
 
   bool toyHasRentals(String id) => rentals.any((r) => r.toyId == id);
@@ -480,78 +449,17 @@ class AppState extends ChangeNotifier {
   /// Removes a toy from the catalog. Refuses (returns false) if any
   /// rental — active or in history — still references it, since
   /// [toyById]'s fallback would otherwise silently mislabel that entry.
+  /// The guard stays here (not in `ToyRepository`) because it needs
+  /// [rentals], a different domain that repository doesn't know about.
   bool removeToy(String id) {
     if (toyHasRentals(id)) return false;
-    toys = toys.where((t) => t.id != id).toList();
-    notifyListeners();
+    _toyRepository.remove(id);
     return true;
   }
 
   // ------------------------------ derived data ------------------------------
 
   List<Rental> get activeRentals => rentals.where((r) => r.status == RentalStatus.active).toList();
-
-  DateTime get _startOfDay {
-    final now = DateTime.now();
-    return DateTime(now.year, now.month, now.day);
-  }
-
-  List<Rental> get doneAll => rentals.where((r) => r.status == RentalStatus.done).toList();
-
-  List<Rental> get doneToday => doneAll.where((r) => r.endedAt != null && !r.endedAt!.isBefore(_startOfDay)).toList();
-
-  double get homeTotalToday => doneToday.fold(0.0, (a, r) => a + r.price);
-
-  List<Rental> get recentActivity {
-    final combined = [...activeRentals, ...doneToday];
-    combined.sort((a, b) {
-      final ta = a.status == RentalStatus.active ? a.startedAt : a.endedAt!;
-      final tb = b.status == RentalStatus.active ? b.startedAt : b.endedAt!;
-      return tb.compareTo(ta);
-    });
-    return combined.take(4).toList();
-  }
-
-  DateTime get _reportCutoff {
-    switch (reportPeriod) {
-      case ReportPeriod.today:
-        return _startOfDay;
-      case ReportPeriod.week:
-        return DateTime.now().subtract(const Duration(days: _reportWindowDays));
-      case ReportPeriod.all:
-        return DateTime.fromMillisecondsSinceEpoch(0);
-    }
-  }
-
-  List<Rental> get reportFiltered =>
-      doneAll.where((r) => r.endedAt != null && !r.endedAt!.isBefore(_reportCutoff)).toList();
-
-  double get reportTotal => reportFiltered.fold(0.0, (a, r) => a + r.price);
-
-  Map<PaymentMethod, double> get paymentBreakdown {
-    final map = <PaymentMethod, double>{};
-    for (final m in PaymentMethod.values) {
-      map[m] = reportFiltered.where((r) => r.paymentMethod == m).fold(0.0, (a, r) => a + r.price);
-    }
-    return map;
-  }
-
-  List<MapEntry<Toy, ({int count, double total})>> get toyBreakdown {
-    final totals = <String, ({int count, double total})>{};
-    for (final r in reportFiltered) {
-      final cur = totals[r.toyId] ?? (count: 0, total: 0.0);
-      totals[r.toyId] = (count: cur.count + 1, total: cur.total + r.price);
-    }
-    final entries = totals.entries.map((e) => MapEntry(toyById(e.key), e.value)).toList();
-    entries.sort((a, b) => b.value.total.compareTo(a.value.total));
-    return entries;
-  }
-
-  List<Rental> get historyList {
-    final list = [...reportFiltered];
-    list.sort((a, b) => b.endedAt!.compareTo(a.endedAt!));
-    return list;
-  }
 
   String get kicker {
     final dt = DateTime.now();
@@ -565,6 +473,4 @@ class AppState extends ChangeNotifier {
         AppTab.catalog => 'Brinquedos',
         AppTab.report => 'Faturamento',
       };
-
-  bool get pulseOnOvertime => _pulseOnOvertime;
 }

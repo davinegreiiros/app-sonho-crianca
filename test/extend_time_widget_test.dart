@@ -9,7 +9,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:sonho_de_crianca/main.dart';
-import 'package:sonho_de_crianca/models/rental.dart';
+import 'package:sonho_de_crianca/domain/models/rental.dart';
 import 'package:sonho_de_crianca/state/app_state.dart';
 import 'package:sonho_de_crianca/test_keys.dart';
 
@@ -18,7 +18,7 @@ void main() {
   SharedPreferences.setMockInitialValues({});
 
   testWidgets('"+ tempo" chips show on a fixed-duration card and extend it on tap', (tester) async {
-    await tester.pumpWidget(const SonhoDeCriancaApp());
+    await tester.pumpWidget(const SonhoDeCriancaApp(startInPostoAdminMode: true));
     await tester.pump(const Duration(milliseconds: 400));
     final state = Provider.of<AppState>(tester.element(find.byType(MaterialApp)), listen: false);
 
@@ -44,7 +44,7 @@ void main() {
   });
 
   testWidgets('"+ tempo" chips are absent on a tempo corrido (open-ended) card', (tester) async {
-    await tester.pumpWidget(const SonhoDeCriancaApp());
+    await tester.pumpWidget(const SonhoDeCriancaApp(startInPostoAdminMode: true));
     await tester.pump(const Duration(milliseconds: 400));
     final state = Provider.of<AppState>(tester.element(find.byType(MaterialApp)), listen: false);
 
@@ -66,7 +66,7 @@ void main() {
   testWidgets('overtime freezes the clock at 00:00 and shows "TEMPO ESGOTADO" once a fixed-duration rental runs past its time', (
     tester,
   ) async {
-    await tester.pumpWidget(const SonhoDeCriancaApp());
+    await tester.pumpWidget(const SonhoDeCriancaApp(startInPostoAdminMode: true));
     await tester.pump(const Duration(milliseconds: 400));
     final state = Provider.of<AppState>(tester.element(find.byType(MaterialApp)), listen: false);
 
@@ -100,8 +100,10 @@ void main() {
       price: rental.price,
       status: RentalStatus.active,
     );
-    state.setTab(state.tab); // notifyListeners via a harmless no-op state change
-    await tester.pump(const Duration(milliseconds: 400));
+    // ActiveTabView (spec 018) rebuilds off ActiveRentalsCubit's own 1s
+    // ticker, not AppState's notifyListeners — pump past that instead of
+    // the old "state.setTab(state.tab)" no-op-notify trick.
+    await tester.pump(const Duration(milliseconds: 1100));
 
     expect(alarmLabel, findsOneWidget);
     // Clock freezes at 00:00 instead of counting up past the duration.

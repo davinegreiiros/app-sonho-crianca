@@ -33,5 +33,19 @@ Sem `spec.md` aprovado, sem código de feature. Bugfix simples e chore não prec
 | [007](007-revisao-design-v3/spec.md) | Revisão de Design v3 — ícones categoria, canhoto, Pix, Configurações, tempo corrido | Implemented | 001, 003, 004, 006 |
 | [008](008-extensao-tempo-alarme/spec.md) | Adicionar tempo e alarme visual de tempo esgotado | Implemented | 005, 006 |
 | [009](009-notificacao-formato-aviso-previo/spec.md) | Notificação de tempo esgotado reformatada + aviso prévio de 5 min | Implemented | 005, 008 |
+| [010](010-migracao-arquitetura-camadas/spec.md) | Migração de arquitetura para camadas — fundação (spec guarda-chuva) | Implemented | — |
+| [011](011-migracao-configuracoes-negocio/spec.md) | Migração: Configurações do negócio (Repository + Cubit + View) | Implemented | 010 |
+| [012](012-migracao-catalogo-criacao/spec.md) | Migração: Catálogo — criação de brinquedo (Repository + Cubit + View) | Implemented | 010, 011 |
+| [013](013-migracao-rental-repository-fundacao/spec.md) | Migração: `RentalRepository` — fundação | Implemented | 010, 012 |
+| [014](014-migracao-relatorio/spec.md) | Migração: Relatório | Implemented | 013 |
+| [015](015-migracao-catalogo-grade/spec.md) | Migração: Catálogo — grade e tickets de disponibilidade | Implemented | 012, 013 |
+| [016](016-migracao-servicos-locacao-fundacao/spec.md) | Migração: Serviços de locação — fundação (Pix payload + notificações) | Implemented | 013 |
+| [017](017-migracao-nova-locacao/spec.md) | Migração: Nova locação (formulário) | Implemented | 016 |
+| [018](018-migracao-locacao-ativa-encerrar/spec.md) | Migração: Locação ativa, estender, cancelar, encerrar + Pix | Implemented | 017 |
+| [019](019-migracao-painel-home/spec.md) | Migração: Painel do dia (Home) | Implemented | 018 |
+| [020](020-persistencia-local/spec.md) | Persistência local (SQLite) — Toy/Rental sobrevivem a restart | Implemented | 019 |
+| [021](021-migracao-shell-app/spec.md) | Migração: Shell do app (tab ativa, cabeçalho, nav) | Implemented | 019 |
+| [022](022-backend-sync-fundacao/spec.md) | Backend + sync entre aparelhos — fundação (spec guarda-chuva) | Implemented | 002, 020 |
+| [023](023-posto-monitor-painel/spec.md) | Posto do monitor + fechamento de turno + painel administrativo | Implemented | 010, 020 |
 
 Todas em `Draft` — cada uma tem "Dúvidas em aberto" que precisa de resposta sua antes de virar `Approved` e ganhar `plan.md`/`tasks.md`.

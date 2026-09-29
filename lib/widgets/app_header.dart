@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../state/app_state.dart';
 import '../test_keys.dart';
 import '../theme/app_colors.dart';
+import '../ui/features/app_shell/view_models/app_shell_cubit.dart';
 import 'animations/bounce.dart';
 import 'animations/print_strip.dart';
 import 'modal_launchers.dart';
@@ -18,7 +18,7 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
+    final state = context.watch<AppShellCubit>().state;
     return Container(
       padding: EdgeInsets.only(
         top: MediaQuery.of(context).padding.top + 10,
@@ -64,6 +64,16 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
                 ),
               ),
               const SizedBox(width: 4),
+              InkWell(
+                key: TestKeys.adminPanelButton,
+                borderRadius: BorderRadius.circular(20),
+                onTap: () => openAdminPanelScreen(context),
+                child: Padding(
+                  padding: const EdgeInsets.all(4),
+                  child: Icon(Icons.dashboard_outlined, size: 18, color: AppColors.text.withValues(alpha: 0.6)),
+                ),
+              ),
+              const SizedBox(width: 2),
               InkWell(
                 key: TestKeys.settingsGearButton,
                 borderRadius: BorderRadius.circular(20),

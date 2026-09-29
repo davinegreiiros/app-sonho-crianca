@@ -2,7 +2,7 @@
 // vector, and payload self-consistency/shape.
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sonho_de_crianca/services/pix_payload.dart';
+import 'package:sonho_de_crianca/data/services/pix_payload.dart';
 
 void main() {
   group('crc16Ccitt', () {
