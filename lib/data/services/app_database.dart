@@ -19,7 +19,7 @@ class AppDatabase {
   AppDatabase({String? path}) : _path = path;
 
   static const _fileName = 'sonho_de_crianca.db';
-  static const _version = 1;
+  static const _version = 2;
 
   final String? _path;
   Database? _database;
@@ -34,6 +34,7 @@ class AppDatabase {
       path,
       version: _version,
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
     );
   }
 
@@ -63,7 +64,34 @@ class AppDatabase {
         price REAL NOT NULL,
         status TEXT NOT NULL,
         ended_at INTEGER,
-        payment_method TEXT
+        payment_method TEXT,
+        created_by_monitor_name TEXT,
+        finished_by_monitor_name TEXT
+      )
+    ''');
+    await _createTurnosTable(db);
+  }
+
+  /// Aditiva (spec 023-posto-monitor-painel): quem já tem banco na v1
+  /// ganha as 2 colunas novas em `rentals` e a tabela `turnos`, sem perder
+  /// nenhum dado existente (regra de não-quebra, `constitution.md`).
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute('ALTER TABLE rentals ADD COLUMN created_by_monitor_name TEXT');
+      await db.execute('ALTER TABLE rentals ADD COLUMN finished_by_monitor_name TEXT');
+      await _createTurnosTable(db);
+    }
+  }
+
+  Future<void> _createTurnosTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE turnos (
+        id TEXT PRIMARY KEY,
+        toy_id TEXT NOT NULL,
+        monitor_name TEXT NOT NULL,
+        opened_at INTEGER NOT NULL,
+        closed_at INTEGER,
+        counted_cash REAL
       )
     ''');
   }

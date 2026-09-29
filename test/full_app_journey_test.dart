@@ -49,7 +49,7 @@ Future<AppState> _pumpApp(WidgetTester tester, {RentalRepository? rentalReposito
   // real device fonts here), so off-screen content is handled per-tap
   // with `ensureVisible`/`scrollUntilVisible` instead, same as
   // `pix_flow_test.dart`/`catalog_tickets_test.dart` already do.
-  await tester.pumpWidget(SonhoDeCriancaApp(rentalRepository: rentalRepository));
+  await tester.pumpWidget(SonhoDeCriancaApp(rentalRepository: rentalRepository, startInPostoAdminMode: true));
   await tester.pump(_settle);
   return Provider.of<AppState>(tester.element(find.byType(MaterialApp)), listen: false);
 }

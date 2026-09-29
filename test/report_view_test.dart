@@ -18,7 +18,7 @@ Future<void> _pumpApp(WidgetTester tester) async {
   // today) — spec 020-persistencia-local: the real app's default
   // RentalRepository starts empty, so this test asks for the seed
   // explicitly.
-  await tester.pumpWidget(SonhoDeCriancaApp(rentalRepository: RentalRepository.withDemoSeed()));
+  await tester.pumpWidget(SonhoDeCriancaApp(rentalRepository: RentalRepository.withDemoSeed(), startInPostoAdminMode: true));
   await tester.pump(const Duration(milliseconds: 400));
   // Navigation lives in AppShellCubit (spec 021-migracao-shell-app), not
   // AppState, since home_shell.dart/app_bottom_nav.dart/app_header.dart

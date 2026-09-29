@@ -25,6 +25,8 @@ class Rental {
     this.endedAt,
     this.paymentMethod,
     this.ratePerMinute,
+    this.createdByMonitorName,
+    this.finishedByMonitorName,
   });
 
   final String id;
@@ -61,12 +63,23 @@ class Rental {
   DateTime? endedAt;
   PaymentMethod? paymentMethod;
 
+  /// Name typed into "Quem é você hoje" (spec 023-posto-monitor-painel)
+  /// when this rental was created from a posto session. `null` = created
+  /// in administrator mode (or data predating this spec) — not a real
+  /// account, just a per-shift label for the audit trail (3d).
+  final String? createdByMonitorName;
+
+  /// Same as [createdByMonitorName], but for whoever confirmed payment
+  /// (set by [finish]).
+  String? finishedByMonitorName;
+
   bool get isOpenEnded => durationMin == null;
 
-  Rental finish(PaymentMethod method) {
+  Rental finish(PaymentMethod method, {String? finishedByMonitorName}) {
     status = RentalStatus.done;
     endedAt = DateTime.now();
     paymentMethod = method;
+    this.finishedByMonitorName = finishedByMonitorName;
     return this;
   }
 }

@@ -17,7 +17,7 @@ Future<AppState> _pumpApp(WidgetTester tester) async {
   // the demo data (spec 020-persistencia-local: the real app's default
   // RentalRepository starts empty, so tests that need `a1`-`a3` ask for
   // it explicitly).
-  await tester.pumpWidget(SonhoDeCriancaApp(rentalRepository: RentalRepository.withDemoSeed()));
+  await tester.pumpWidget(SonhoDeCriancaApp(rentalRepository: RentalRepository.withDemoSeed(), startInPostoAdminMode: true));
   await tester.pump(const Duration(milliseconds: 400));
   return Provider.of<AppState>(tester.element(find.byType(MaterialApp)), listen: false);
 }

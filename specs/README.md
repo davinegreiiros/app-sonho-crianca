@@ -46,5 +46,6 @@ Sem `spec.md` aprovado, sem código de feature. Bugfix simples e chore não prec
 | [020](020-persistencia-local/spec.md) | Persistência local (SQLite) — Toy/Rental sobrevivem a restart | Implemented | 019 |
 | [021](021-migracao-shell-app/spec.md) | Migração: Shell do app (tab ativa, cabeçalho, nav) | Implemented | 019 |
 | [022](022-backend-sync-fundacao/spec.md) | Backend + sync entre aparelhos — fundação (spec guarda-chuva) | Implemented | 002, 020 |
+| [023](023-posto-monitor-painel/spec.md) | Posto do monitor + fechamento de turno + painel administrativo | Implemented | 010, 020 |
 
 Todas em `Draft` — cada uma tem "Dúvidas em aberto" que precisa de resposta sua antes de virar `Approved` e ganhar `plan.md`/`tasks.md`.

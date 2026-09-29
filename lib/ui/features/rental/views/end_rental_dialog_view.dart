@@ -8,6 +8,7 @@ import '../../../../theme/app_colors.dart';
 import '../../../../widgets/animations/pressable.dart';
 import '../../../../widgets/modal_launchers.dart';
 import '../../business_settings/view_models/business_settings_cubit.dart';
+import '../../posto/view_models/posto_session_cubit.dart';
 import '../view_models/active_rentals_cubit.dart';
 import 'pix_qr_sheet_view.dart';
 
@@ -163,7 +164,7 @@ class EndRentalDialogView extends StatelessWidget {
                                       cubit.showPixQrStep();
                                       return;
                                     }
-                                    cubit.confirmEnd();
+                                    cubit.confirmEnd(actingMonitorName: context.read<PostoSessionCubit>().state.monitorName);
                                     Navigator.of(context).pop();
                                   }
                                 : null,

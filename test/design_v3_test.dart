@@ -17,7 +17,7 @@ import 'package:sonho_de_crianca/ui/features/app_shell/view_models/app_shell_cub
 import 'package:sonho_de_crianca/widgets/category_icon.dart';
 
 Future<AppState> _pumpApp(WidgetTester tester, {RentalRepository? rentalRepository}) async {
-  await tester.pumpWidget(SonhoDeCriancaApp(rentalRepository: rentalRepository));
+  await tester.pumpWidget(SonhoDeCriancaApp(rentalRepository: rentalRepository, startInPostoAdminMode: true));
   await tester.pump(const Duration(milliseconds: 400));
   return Provider.of<AppState>(tester.element(find.byType(MaterialApp)), listen: false);
 }

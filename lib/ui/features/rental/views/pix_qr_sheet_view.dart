@@ -11,6 +11,7 @@ import '../../../../widgets/animations/pressable.dart';
 import '../../../../widgets/animations/print_strip.dart';
 import '../../../../widgets/animations/pulse.dart';
 import '../../business_settings/view_models/business_settings_cubit.dart';
+import '../../posto/view_models/posto_session_cubit.dart';
 import '../view_models/active_rentals_cubit.dart';
 
 /// Shows the Pix QR (+ "copia e cola" text) for a rental's final price,
@@ -242,7 +243,8 @@ class PixQrSheetView extends StatelessWidget {
                             // the `Navigator` first, while `context` is still
                             // good.
                             final navigator = Navigator.of(context);
-                            cubit.confirmEnd();
+                            final actingMonitorName = context.read<PostoSessionCubit>().state.monitorName;
+                            cubit.confirmEnd(actingMonitorName: actingMonitorName);
                             navigator.pop();
                           },
                           style: ElevatedButton.styleFrom(

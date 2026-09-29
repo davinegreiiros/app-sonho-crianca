@@ -40,6 +40,8 @@ class RentalLocalService {
         'status': rental.status.name,
         'ended_at': rental.endedAt?.millisecondsSinceEpoch,
         'payment_method': rental.paymentMethod?.name,
+        'created_by_monitor_name': rental.createdByMonitorName,
+        'finished_by_monitor_name': rental.finishedByMonitorName,
       };
 
   Rental _fromRow(Map<String, Object?> row) => Rental(
@@ -55,5 +57,7 @@ class RentalLocalService {
         status: RentalStatus.values.byName(row['status'] as String),
         endedAt: row['ended_at'] == null ? null : DateTime.fromMillisecondsSinceEpoch(row['ended_at'] as int),
         paymentMethod: row['payment_method'] == null ? null : PaymentMethod.values.byName(row['payment_method'] as String),
+        createdByMonitorName: row['created_by_monitor_name'] as String?,
+        finishedByMonitorName: row['finished_by_monitor_name'] as String?,
       );
 }

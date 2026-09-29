@@ -18,7 +18,7 @@ void main() {
   SharedPreferences.setMockInitialValues({});
 
   testWidgets('"+ tempo" chips show on a fixed-duration card and extend it on tap', (tester) async {
-    await tester.pumpWidget(const SonhoDeCriancaApp());
+    await tester.pumpWidget(const SonhoDeCriancaApp(startInPostoAdminMode: true));
     await tester.pump(const Duration(milliseconds: 400));
     final state = Provider.of<AppState>(tester.element(find.byType(MaterialApp)), listen: false);
 
@@ -44,7 +44,7 @@ void main() {
   });
 
   testWidgets('"+ tempo" chips are absent on a tempo corrido (open-ended) card', (tester) async {
-    await tester.pumpWidget(const SonhoDeCriancaApp());
+    await tester.pumpWidget(const SonhoDeCriancaApp(startInPostoAdminMode: true));
     await tester.pump(const Duration(milliseconds: 400));
     final state = Provider.of<AppState>(tester.element(find.byType(MaterialApp)), listen: false);
 
@@ -66,7 +66,7 @@ void main() {
   testWidgets('overtime freezes the clock at 00:00 and shows "TEMPO ESGOTADO" once a fixed-duration rental runs past its time', (
     tester,
   ) async {
-    await tester.pumpWidget(const SonhoDeCriancaApp());
+    await tester.pumpWidget(const SonhoDeCriancaApp(startInPostoAdminMode: true));
     await tester.pump(const Duration(milliseconds: 400));
     final state = Provider.of<AppState>(tester.element(find.byType(MaterialApp)), listen: false);
 

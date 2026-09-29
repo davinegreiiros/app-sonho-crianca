@@ -5,22 +5,29 @@ import 'package:provider/provider.dart';
 import 'data/repositories/business_settings_repository.dart';
 import 'data/repositories/rental_repository.dart';
 import 'data/repositories/toy_repository.dart';
+import 'data/repositories/turno_repository.dart';
 import 'data/services/app_database.dart';
 import 'data/services/rental_local_service.dart';
 import 'data/services/toy_local_service.dart';
+import 'data/services/turno_local_service.dart';
 import 'screens/home_shell.dart';
 import 'state/app_state.dart';
 import 'theme/app_theme.dart';
+import 'ui/features/admin_panel/view_models/admin_panel_cubit.dart';
 import 'ui/features/app_shell/view_models/app_shell_cubit.dart';
 import 'ui/features/business_settings/view_models/business_settings_cubit.dart';
 import 'ui/features/catalog/view_models/toy_catalog_cubit.dart';
 import 'ui/features/home/view_models/home_cubit.dart';
+import 'ui/features/posto/view_models/posto_session_cubit.dart';
+import 'ui/features/posto/view_models/posto_session_state.dart';
+import 'ui/features/posto/views/monitor_posto_view.dart';
+import 'ui/features/posto/views/open_posto_view.dart';
 import 'ui/features/rental/view_models/active_rentals_cubit.dart';
 import 'ui/features/rental/view_models/new_rental_cubit.dart';
 import 'ui/features/report/view_models/report_cubit.dart';
 
 /// Bootstrap assíncrono (spec 020-persistencia-local): abre o banco local e
-/// espera os 3 `load()` resolverem **antes** do primeiro frame — sem isso o
+/// espera os 4 `load()` resolverem **antes** do primeiro frame — sem isso o
 /// boot mostraria Catálogo/Painel vazios por um instante até os dados
 /// persistidos chegarem (`WidgetsFlutterBinding.ensureInitialized()` é
 /// exigido pelo `sqflite` antes de abrir um banco fora da árvore de
@@ -32,35 +39,47 @@ Future<void> main() async {
   final businessSettingsRepository = BusinessSettingsRepository();
   final toyRepository = ToyRepository(localService: ToyLocalService(appDatabase));
   final rentalRepository = RentalRepository(localService: RentalLocalService(appDatabase));
+  final turnoRepository = TurnoRepository(localService: TurnoLocalService(appDatabase));
   await Future.wait([
     businessSettingsRepository.load(),
     toyRepository.load(),
     rentalRepository.load(),
+    turnoRepository.load(),
   ]);
 
   runApp(SonhoDeCriancaApp(
     businessSettingsRepository: businessSettingsRepository,
     toyRepository: toyRepository,
     rentalRepository: rentalRepository,
+    turnoRepository: turnoRepository,
   ));
 }
 
 class SonhoDeCriancaApp extends StatelessWidget {
-  /// Os 3 Repositories são opcionais só pra teste — `tester.pumpWidget(const
+  /// Os 4 Repositories são opcionais só pra teste — `tester.pumpWidget(const
   /// SonhoDeCriancaApp())` continua funcionando sem banco/SharedPreferences
   /// real (cada um cai no seu próprio construtor default, síncrono, sem
-  /// `_localService`). Em produção, `main()` sempre passa os 3 já
+  /// `_localService`). Em produção, `main()` sempre passa os 4 já
   /// carregados.
+  ///
+  /// [startInPostoAdminMode] (spec 023-posto-monitor-painel): só pra
+  /// teste — nasce direto em modo administrador (`HomeShell`), pulando a
+  /// tela de escolher posto (3a). Produção nunca passa isto (o app
+  /// sempre começa em 3a); ver `plan.md`/"Riscos" da spec.
   const SonhoDeCriancaApp({
     super.key,
     this.businessSettingsRepository,
     this.toyRepository,
     this.rentalRepository,
+    this.turnoRepository,
+    this.startInPostoAdminMode = false,
   });
 
   final BusinessSettingsRepository? businessSettingsRepository;
   final ToyRepository? toyRepository;
   final RentalRepository? rentalRepository;
+  final TurnoRepository? turnoRepository;
+  final bool startInPostoAdminMode;
 
   @override
   Widget build(BuildContext context) {
@@ -81,6 +100,9 @@ class SonhoDeCriancaApp extends StatelessWidget {
         ),
         ChangeNotifierProvider<RentalRepository>(
           create: (_) => rentalRepository ?? RentalRepository(),
+        ),
+        ChangeNotifierProvider<TurnoRepository>(
+          create: (_) => turnoRepository ?? TurnoRepository(),
         ),
         ChangeNotifierProvider<AppState>(
           create: (context) => AppState(
@@ -115,12 +137,39 @@ class SonhoDeCriancaApp extends StatelessWidget {
               BlocProvider<HomeCubit>(
                 create: (context) => HomeCubit(context.read<ToyRepository>(), context.read<RentalRepository>()),
               ),
+              BlocProvider<PostoSessionCubit>(
+                create: (context) => PostoSessionCubit(
+                  context.read<ToyRepository>(),
+                  context.read<RentalRepository>(),
+                  context.read<TurnoRepository>(),
+                  startInAdminMode: startInPostoAdminMode,
+                ),
+              ),
+              BlocProvider<AdminPanelCubit>(
+                create: (context) => AdminPanelCubit(
+                  context.read<RentalRepository>(),
+                  context.read<ToyRepository>(),
+                  context.read<TurnoRepository>(),
+                ),
+              ),
             ],
             child: MaterialApp(
               title: 'Sonho de Criança',
               debugShowCheckedModeBanner: false,
               theme: AppTheme.light(),
-              home: const HomeShell(),
+              // Sessão de posto (spec 023-posto-monitor-painel): a raiz da
+              // navegação alterna entre 3a (nenhum posto), 3b (dentro de um
+              // posto) e o `HomeShell` de sempre (administrador) — nenhuma
+              // rota nomeada nova, mesmo racional de `MaterialPageRoute`
+              // que `openBusinessSettingsScreen`/`openAdminPanelScreen` já
+              // usam por cima desta árvore.
+              home: BlocBuilder<PostoSessionCubit, PostoSessionState>(
+                builder: (context, state) => switch (state.mode) {
+                  PostoMode.none => const OpenPostoView(),
+                  PostoMode.monitor => const MonitorPostoView(),
+                  PostoMode.admin => const HomeShell(),
+                },
+              ),
             ),
           );
         },

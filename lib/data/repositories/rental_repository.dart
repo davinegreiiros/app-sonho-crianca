@@ -100,6 +100,7 @@ class RentalRepository extends ChangeNotifier {
     required int? durationMin,
     required double price,
     required double? ratePerMinute,
+    String? createdByMonitorName,
   }) {
     final rental = Rental(
       id: 'r${DateTime.now().microsecondsSinceEpoch}',
@@ -112,6 +113,7 @@ class RentalRepository extends ChangeNotifier {
       price: price,
       status: RentalStatus.active,
       ratePerMinute: ratePerMinute,
+      createdByMonitorName: createdByMonitorName,
     );
     add(rental);
     return rental;
@@ -150,10 +152,10 @@ class RentalRepository extends ChangeNotifier {
   /// [finalPrice] is only passed for an open-ended rental (the caller —
   /// `AppState`/`ActiveRentalsCubit` — decides; a fixed-duration rental's
   /// price never changes at finish time).
-  void finish(String rentalId, PaymentMethod method, {double? finalPrice}) {
+  void finish(String rentalId, PaymentMethod method, {double? finalPrice, String? finishedByMonitorName}) {
     final r = rentals.firstWhere((r) => r.id == rentalId, orElse: () => rentals.first);
     if (finalPrice != null) r.price = finalPrice;
-    r.finish(method);
+    r.finish(method, finishedByMonitorName: finishedByMonitorName);
     notifyListeners();
     unawaited(_persist(r));
   }

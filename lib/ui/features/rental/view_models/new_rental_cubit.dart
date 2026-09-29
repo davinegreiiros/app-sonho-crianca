@@ -108,7 +108,11 @@ class NewRentalCubit extends Cubit<NewRentalState> {
 
   void setCustomRate(double? v) => emit(state.copyWith(customRatePerMinute: v));
 
-  Rental submit() {
+  /// [createdByMonitorName]: quem está no posto quando a sheet foi aberta
+  /// a partir de [MonitorPostoView] (spec 023-posto-monitor-painel) —
+  /// `null` em modo administrador (call site lê `PostoSessionCubit`, não
+  /// este Cubit, ver `plan.md`).
+  Rental submit({String? createdByMonitorName}) {
     final s = state;
     final rental = _rentalRepository.addNew(
       toyId: s.toyId,
@@ -120,6 +124,7 @@ class NewRentalCubit extends Cubit<NewRentalState> {
       // Captured once, here — never re-derived from the toy later (see
       // the field's doc on `Rental`).
       ratePerMinute: s.openEnded ? (s.customRatePerMinute ?? s.suggestedRatePerMinute) : null,
+      createdByMonitorName: createdByMonitorName,
     );
     _scheduleRentalEndNotifications(rental, s.toy, _notifications);
     return rental;

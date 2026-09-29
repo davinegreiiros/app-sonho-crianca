@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../data/repositories/toy_repository.dart';
 import '../theme/app_colors.dart';
+import '../ui/features/admin_panel/views/admin_panel_view.dart';
 import '../ui/features/business_settings/views/business_settings_view.dart';
 import '../ui/features/catalog/views/add_toy_sheet_view.dart';
 import '../ui/features/rental/view_models/active_rentals_cubit.dart';
@@ -20,7 +21,12 @@ import '../ui/features/rental/views/new_rental_sheet_view.dart';
 /// *some* toy for the draft (needs one to compute duration/price), which
 /// has no sane answer with zero toys — bail out with a message instead of
 /// letting that pick blow up.
-Future<void> showNewRentalSheet(BuildContext context) async {
+///
+/// [lockedToyId] (spec 023-posto-monitor-painel): quando vem de
+/// [MonitorPostoView], trava o brinquedo antes de abrir — a sheet
+/// (`NewRentalSheetView`) esconde o seletor sozinha, olhando pro modo da
+/// sessão de posto, mas o draft precisa nascer com o `toyId` certo.
+Future<void> showNewRentalSheet(BuildContext context, {String? lockedToyId}) async {
   if (context.read<ToyRepository>().toys.isEmpty) {
     final messenger = ScaffoldMessenger.of(context);
     messenger.hideCurrentSnackBar();
@@ -32,7 +38,9 @@ Future<void> showNewRentalSheet(BuildContext context) async {
     );
     return;
   }
-  context.read<NewRentalCubit>().open();
+  final newRentalCubit = context.read<NewRentalCubit>();
+  newRentalCubit.open();
+  if (lockedToyId != null) newRentalCubit.setToy(lockedToyId);
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -88,5 +96,14 @@ Future<void> showAddToySheet(BuildContext context) {
 Future<void> openBusinessSettingsScreen(BuildContext context, {String? hint}) {
   return Navigator.of(context).push<void>(
     MaterialPageRoute(builder: (context) => BusinessSettingsView(hint: hint)),
+  );
+}
+
+/// Opens o painel administrativo (3d, spec 023-posto-monitor-painel) como
+/// tela cheia — mesmo padrão de [openBusinessSettingsScreen]. Só chegável
+/// em modo administrador (único jeito de estar no `HomeShell`).
+Future<void> openAdminPanelScreen(BuildContext context) {
+  return Navigator.of(context).push<void>(
+    MaterialPageRoute(builder: (context) => const AdminPanelView()),
   );
 }

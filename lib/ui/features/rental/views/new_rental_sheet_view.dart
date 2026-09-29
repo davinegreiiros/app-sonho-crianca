@@ -6,6 +6,8 @@ import '../../../../test_keys.dart';
 import '../../../../theme/app_colors.dart';
 import '../../../../widgets/animations/pressable.dart';
 import '../../../../widgets/animations/print_strip.dart';
+import '../../posto/view_models/posto_session_cubit.dart';
+import '../../posto/view_models/posto_session_state.dart';
 import '../view_models/new_rental_cubit.dart';
 import '../view_models/new_rental_state.dart';
 
@@ -22,6 +24,12 @@ class NewRentalSheetView extends StatelessWidget {
     final cubit = context.watch<NewRentalCubit>();
     final draft = cubit.state;
     final presets = const [5, 10, 30, 60];
+    // Aberta a partir de um posto (spec 023-posto-monitor-painel): o
+    // brinquedo já veio travado (`showNewRentalSheet` chama `setToy` antes
+    // de abrir), então o seletor vira um rótulo fixo e a locação nasce
+    // marcada com quem está no posto.
+    final postoState = context.watch<PostoSessionCubit>().state;
+    final fromPosto = postoState.mode == PostoMode.monitor;
 
     return DecoratedBox(
       decoration: const BoxDecoration(
@@ -48,7 +56,19 @@ class NewRentalSheetView extends StatelessWidget {
                   style: TextStyle(fontSize: 19, fontWeight: FontWeight.w600)),
               const SizedBox(height: 12),
               const _FieldLabel('Brinquedo'),
-              _Dropdown(cubit: cubit, draft: draft),
+              if (fromPosto)
+                Container(
+                  height: 38,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  alignment: Alignment.centerLeft,
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                  child: Text(draft.toy.name, style: const TextStyle(fontSize: 14, color: AppColors.text)),
+                )
+              else
+                _Dropdown(cubit: cubit, draft: draft),
               const SizedBox(height: 12),
               const _FieldLabel('Nome da criança'),
               _TextInput(
@@ -224,7 +244,7 @@ class NewRentalSheetView extends StatelessWidget {
                         key: TestKeys.submitNewRentalButton,
                         onPressed: draft.canSubmit
                             ? () {
-                                cubit.submit();
+                                cubit.submit(createdByMonitorName: fromPosto ? postoState.monitorName : null);
                                 Navigator.of(context).pop();
                               }
                             : null,

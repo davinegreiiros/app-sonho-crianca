@@ -29,7 +29,7 @@ Finder _ticketsIn(Finder card) =>
 bool _isFree(Widget ticket) => (ticket as dynamic).free as bool;
 
 Future<AppState> _pumpApp(WidgetTester tester, {RentalRepository? rentalRepository}) async {
-  await tester.pumpWidget(SonhoDeCriancaApp(rentalRepository: rentalRepository));
+  await tester.pumpWidget(SonhoDeCriancaApp(rentalRepository: rentalRepository, startInPostoAdminMode: true));
   await tester.pump(const Duration(milliseconds: 400));
   final state = Provider.of<AppState>(tester.element(find.byType(MaterialApp)), listen: false);
   // Navigation lives in AppShellCubit (spec 021-migracao-shell-app), not

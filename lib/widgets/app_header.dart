@@ -65,6 +65,16 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
               ),
               const SizedBox(width: 4),
               InkWell(
+                key: TestKeys.adminPanelButton,
+                borderRadius: BorderRadius.circular(20),
+                onTap: () => openAdminPanelScreen(context),
+                child: Padding(
+                  padding: const EdgeInsets.all(4),
+                  child: Icon(Icons.dashboard_outlined, size: 18, color: AppColors.text.withValues(alpha: 0.6)),
+                ),
+              ),
+              const SizedBox(width: 2),
+              InkWell(
                 key: TestKeys.settingsGearButton,
                 borderRadius: BorderRadius.circular(20),
                 onTap: () => openBusinessSettingsScreen(context),

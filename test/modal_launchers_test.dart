@@ -22,7 +22,7 @@ void main() {
   SharedPreferences.setMockInitialValues({});
 
   testWidgets('tapping "+" with an empty catalog shows a message instead of crashing', (tester) async {
-    await tester.pumpWidget(const SonhoDeCriancaApp());
+    await tester.pumpWidget(const SonhoDeCriancaApp(startInPostoAdminMode: true));
     await tester.pump(_settle);
 
     // Empties the catalog mid-session (booting with an already-empty

@@ -115,7 +115,10 @@ class ActiveRentalsCubit extends Cubit<ActiveRentalsState> {
   /// closing the dialog.
   void hidePixQrStep() => emit(state.copyWith(endShowPixQr: false, endFrozenPrice: null));
 
-  void confirmEnd() {
+  /// [actingMonitorName]: quem está no posto quando o encerramento vem de
+  /// [MonitorPostoView] (spec 023-posto-monitor-painel) — `null` em modo
+  /// administrador (call site lê `PostoSessionCubit`, não este Cubit).
+  void confirmEnd({String? actingMonitorName}) {
     final payment = state.endPayment;
     final id = state.endingId;
     if (payment == null || id == null) return;
@@ -128,6 +131,7 @@ class ActiveRentalsCubit extends Cubit<ActiveRentalsState> {
       r.id,
       payment,
       finalPrice: r.isOpenEnded ? (state.endFrozenPrice ?? computeFinalPrice(r)) : null,
+      finishedByMonitorName: actingMonitorName,
     );
     emit(state.copyWith(endingId: null, endPayment: null, endFrozenPrice: null));
   }
