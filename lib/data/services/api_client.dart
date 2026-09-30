@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import 'api_exceptions.dart';
@@ -17,10 +18,21 @@ import 'api_exceptions.dart';
 /// `httpClient` injetável pra teste (`package:http/testing.dart`,
 /// `MockClient`) — nenhum teste desta fatia bate no backend real.
 class ApiClient {
-  ApiClient({http.Client? httpClient, String? baseUrl}) : _client = httpClient ?? http.Client(), _baseUrl = baseUrl ?? _defaultBaseUrl;
+  ApiClient({http.Client? httpClient, String? baseUrl, bool allowCleartext = kDebugMode})
+      : _client = httpClient ?? http.Client(),
+        _baseUrl = baseUrl ?? _defaultBaseUrl {
+    // `dart:io` não respeita o bloqueio de cleartext do Android nem o ATS
+    // do iOS — sem esta guarda, um release compilado com `API_BASE_URL`
+    // em `http://` mandaria senha e Bearer token sem TLS. Falha no boot,
+    // não na primeira requisição, pra o build errado nunca parecer ok.
+    if (!allowCleartext && Uri.parse(_baseUrl).scheme != 'https') {
+      throw StateError('API_BASE_URL precisa ser https fora do modo debug: $_baseUrl');
+    }
+  }
 
   /// Produção por padrão; aponta pra outro lugar (ex. `next dev` na rede
-  /// local) via `flutter run --dart-define=API_BASE_URL=http://192.168.x.x:3000`.
+  /// local) via `flutter run --dart-define=API_BASE_URL=http://192.168.x.x:3000`
+  /// — `http://` só é aceito em build debug (ver construtor).
   static const _defaultBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
     defaultValue: 'https://sonho-de-crianca-backend.vercel.app',

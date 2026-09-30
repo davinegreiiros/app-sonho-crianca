@@ -215,19 +215,28 @@ class _BusinessSettingsViewState extends State<BusinessSettingsView> {
                       ),
                       const SizedBox(height: 12),
                     ],
-                    if (state.status == BusinessSettingsSyncStatus.networkError) ...[
+                    if (state.status == BusinessSettingsSyncStatus.networkError ||
+                        state.status == BusinessSettingsSyncStatus.serverError) ...[
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(color: AppColors.yellowTint, borderRadius: BorderRadius.circular(6)),
-                        child: const Row(
+                        child: Row(
                           children: [
-                            Icon(Icons.wifi_off_rounded, size: 16, color: AppColors.yellowFgDark),
-                            SizedBox(width: 8),
+                            Icon(
+                              state.status == BusinessSettingsSyncStatus.networkError
+                                  ? Icons.wifi_off_rounded
+                                  : Icons.error_outline_rounded,
+                              size: 16,
+                              color: AppColors.yellowFgDark,
+                            ),
+                            const SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                'Sem conexão com o servidor — não foi possível carregar/salvar agora.',
-                                style: TextStyle(fontSize: 12.5, color: AppColors.yellowFgDark),
+                                state.status == BusinessSettingsSyncStatus.networkError
+                                    ? 'Sem conexão com o servidor — não foi possível carregar/salvar agora.'
+                                    : 'O servidor respondeu com erro — não foi possível carregar/salvar agora. Tente de novo em instantes.',
+                                style: const TextStyle(fontSize: 12.5, color: AppColors.yellowFgDark),
                               ),
                             ),
                           ],

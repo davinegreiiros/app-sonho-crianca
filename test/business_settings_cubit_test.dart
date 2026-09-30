@@ -126,6 +126,35 @@ void main() {
       expect(repository.status, BusinessSettingsSyncStatus.networkError);
       expect(repository.settings, const BusinessSettings());
     });
+
+    test('500 no load() marca serverError em vez de ficar preso em loading', () async {
+      final repository = _repository(
+        MockClient((request) async => http.Response(jsonEncode({'error': 'Erro interno'}), 500)),
+      );
+
+      await repository.load();
+
+      expect(repository.status, BusinessSettingsSyncStatus.serverError);
+      expect(repository.settings, const BusinessSettings());
+    });
+
+    test('400 no update() marca serverError sem lançar', () async {
+      final repository = _repository(
+        MockClient((request) async => http.Response(jsonEncode({'error': 'pixKey inválida'}), 400)),
+      );
+
+      await repository.update(const BusinessSettings(merchantName: 'Loja X', merchantCity: 'Recife', pixKey: 'x'));
+
+      expect(repository.status, BusinessSettingsSyncStatus.serverError);
+    });
+
+    test('corpo 200 fora do formato esperado marca serverError', () async {
+      final repository = _repository(MockClient((request) async => http.Response('<html>proxy</html>', 200)));
+
+      await repository.load();
+
+      expect(repository.status, BusinessSettingsSyncStatus.serverError);
+    });
   });
 
   group('BusinessSettingsCubit', () {
