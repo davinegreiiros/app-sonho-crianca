@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
-import '../../../../domain/models/business_settings.dart';
+import '../../../../data/repositories/business_settings_repository.dart';
 import '../../../../data/services/pix_payload.dart';
 import '../../../../test_keys.dart';
 import '../../../../theme/app_colors.dart';
@@ -10,18 +10,22 @@ import '../../../../widgets/animations/bounce.dart';
 import '../../../../widgets/animations/print_strip.dart';
 import '../../../../widgets/animations/pressable.dart';
 import '../view_models/business_settings_cubit.dart';
+import '../view_models/business_settings_state.dart';
+
+/// Motivo de saída de [BusinessSettingsView] pro `Navigator.pop` — usado só
+/// por `openBusinessSettingsScreen` (spec 024-sync-backend-fundacao) pra
+/// decidir se mostra um aviso. `null` (voltar manual) não precisa de aviso.
+enum BusinessSettingsExitReason { sessionExpired }
 
 /// "Configurações do negócio" — name/city/Pix key used to generate the
-/// Pix QR at the end of a locação (spec 004-pix-qrcode). Persisted
-/// locally only — see `BusinessSettingsRepository` and
-/// `specs/002-seguranca-dados/spec.md` (never hardcoded, never in git).
+/// Pix QR at the end of a locação (spec 004-pix-qrcode). A partir da spec
+/// 024-sync-backend-fundacao, sincroniza com o backend (não mais só
+/// `SharedPreferences`) — ver `BusinessSettingsRepository`. Só é alcançável
+/// com sessão de operador válida (guarda em `openBusinessSettingsScreen`).
 ///
 /// A full-page destination (`Navigator.push`), not a bottom sheet — spec
 /// 007-revisao-design-v3, artboard 1d: "é destino de navegação, não
 /// formulário de fluxo".
-///
-/// Migrated in spec 011-migracao-configuracoes-negocio: reads/writes
-/// through [BusinessSettingsCubit] instead of `AppState`.
 class BusinessSettingsView extends StatefulWidget {
   const BusinessSettingsView({super.key, this.hint});
 
@@ -34,11 +38,14 @@ class BusinessSettingsView extends StatefulWidget {
 }
 
 class _BusinessSettingsViewState extends State<BusinessSettingsView> {
-  late final _nameCtrl = TextEditingController(text: _settings.merchantName);
-  late final _cityCtrl = TextEditingController(text: _settings.merchantCity);
-  late final _pixKeyCtrl = TextEditingController(text: _settings.pixKey);
+  final _nameCtrl = TextEditingController();
+  final _cityCtrl = TextEditingController();
+  final _pixKeyCtrl = TextEditingController();
 
-  BusinessSettings get _settings => context.read<BusinessSettingsCubit>().state.settings;
+  /// Só sincroniza os controllers com o valor do backend uma vez, na
+  /// primeira resposta depois do `loading` inicial — evita sobrescrever o
+  /// que o operador já digitou se o Cubit emitir de novo por outro motivo.
+  bool _fieldsSynced = false;
 
   @override
   void initState() {
@@ -46,6 +53,15 @@ class _BusinessSettingsViewState extends State<BusinessSettingsView> {
     for (final c in [_nameCtrl, _cityCtrl, _pixKeyCtrl]) {
       c.addListener(() => setState(() {}));
     }
+    // Busca o valor atual no backend ao entrar na tela — não no boot do
+    // app (spec 024: evita rede em todo cold start por um dado que só
+    // importa quando esta tela abre de verdade). Agendado pro fim do
+    // frame atual: chamar direto aqui notificaria (`Repository.load()`
+    // seta `status = loading` e notifica antes de qualquer `await`) no
+    // meio do build desta própria tela, o que o framework não permite.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<BusinessSettingsCubit>().refresh();
+    });
   }
 
   @override
@@ -58,19 +74,48 @@ class _BusinessSettingsViewState extends State<BusinessSettingsView> {
 
   bool get _valid => _nameCtrl.text.trim().isNotEmpty && _cityCtrl.text.trim().isNotEmpty && _pixKeyCtrl.text.trim().isNotEmpty;
 
-  void _save(BusinessSettingsCubit cubit) {
+  Future<void> _save(BusinessSettingsCubit cubit) async {
     if (!_valid) return;
-    cubit.save(
+    await cubit.save(
       merchantName: _nameCtrl.text.trim(),
       merchantCity: _cityCtrl.text.trim(),
       pixKey: _pixKeyCtrl.text.trim(),
     );
-    Navigator.of(context).pop();
+    if (!mounted) return;
+    // Só fecha em sucesso confirmado — erro de rede/sessão fica visível
+    // no banner (spec 024, cenário 6: nunca finge que salvou).
+    if (cubit.state.status == BusinessSettingsSyncStatus.loaded) {
+      Navigator.of(context).pop();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final cubit = context.watch<BusinessSettingsCubit>();
+    final state = cubit.state;
+
+    return BlocListener<BusinessSettingsCubit, BusinessSettingsState>(
+      listenWhen: (prev, curr) => prev.status != curr.status,
+      listener: (context, state) {
+        if (!_fieldsSynced &&
+            state.status != BusinessSettingsSyncStatus.loading &&
+            state.status != BusinessSettingsSyncStatus.idle) {
+          _nameCtrl.text = state.settings.merchantName;
+          _cityCtrl.text = state.settings.merchantCity;
+          _pixKeyCtrl.text = state.settings.pixKey;
+          _fieldsSynced = true;
+        }
+        if (state.status == BusinessSettingsSyncStatus.unauthorized) {
+          Navigator.of(context).pop(BusinessSettingsExitReason.sessionExpired);
+        }
+      },
+      child: _buildScaffold(context, cubit, state),
+    );
+  }
+
+  Widget _buildScaffold(BuildContext context, BusinessSettingsCubit cubit, BusinessSettingsState state) {
+    final firstLoadPending = state.status == BusinessSettingsSyncStatus.loading && !_fieldsSynced;
+
     // Preview only — never persisted, never sent anywhere. Built from
     // whatever's typed so far, amount 0 (a placeholder charge amount is
     // fine for a QR that only exists to show the operator "this is what
@@ -149,86 +194,112 @@ class _BusinessSettingsViewState extends State<BusinessSettingsView> {
               ),
             ),
           ),
-          SliverPadding(
-            padding: EdgeInsets.fromLTRB(20, 18, 20, 22 + MediaQuery.of(context).viewInsets.bottom),
-            sliver: SliverToBoxAdapter(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (widget.hint != null) ...[
+          if (firstLoadPending)
+            const SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(child: CircularProgressIndicator(color: AppColors.accent)),
+            )
+          else
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(20, 18, 20, 22 + MediaQuery.of(context).viewInsets.bottom),
+              sliver: SliverToBoxAdapter(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (widget.hint != null) ...[
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(color: AppColors.yellowTint, borderRadius: BorderRadius.circular(6)),
+                        child: Text(widget.hint!, style: const TextStyle(fontSize: 12.5, color: AppColors.yellowFgDark)),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                    if (state.status == BusinessSettingsSyncStatus.networkError) ...[
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(color: AppColors.yellowTint, borderRadius: BorderRadius.circular(6)),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.wifi_off_rounded, size: 16, color: AppColors.yellowFgDark),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Sem conexão com o servidor — não foi possível carregar/salvar agora.',
+                                style: TextStyle(fontSize: 12.5, color: AppColors.yellowFgDark),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                    _SectionHeader(icon: Icons.storefront_outlined, color: AppColors.accent700, label: 'Recebedor'),
+                    const SizedBox(height: 12),
+                    const _FieldLabel('Nome que aparece no Pix'),
+                    _Field(key: TestKeys.businessNameField, controller: _nameCtrl, hint: 'Ex: Sonho de Criança'),
+                    const SizedBox(height: 14),
+                    const _FieldLabel('Cidade'),
+                    _Field(key: TestKeys.businessCityField, controller: _cityCtrl, hint: 'Ex: Fortaleza'),
+                    const SizedBox(height: 24),
+                    _SectionHeader(icon: Icons.key_outlined, color: AppColors.accent2_700, label: 'Chave Pix'),
+                    const SizedBox(height: 12),
+                    const _FieldLabel('Telefone, CPF, e-mail ou aleatória'),
+                    _Field(
+                      key: TestKeys.businessPixKeyField,
+                      controller: _pixKeyCtrl,
+                      hint: 'CPF, CNPJ, telefone, e-mail ou chave aleatória',
+                      monospace: true,
+                    ),
+                    const SizedBox(height: 10),
                     Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(color: AppColors.yellowTint, borderRadius: BorderRadius.circular(6)),
-                      child: Text(widget.hint!, style: const TextStyle(fontSize: 12.5, color: AppColors.yellowFgDark)),
-                    ),
-                    const SizedBox(height: 20),
-                  ],
-                  _SectionHeader(icon: Icons.storefront_outlined, color: AppColors.accent700, label: 'Recebedor'),
-                  const SizedBox(height: 12),
-                  const _FieldLabel('Nome que aparece no Pix'),
-                  _Field(key: TestKeys.businessNameField, controller: _nameCtrl, hint: 'Ex: Sonho de Criança'),
-                  const SizedBox(height: 14),
-                  const _FieldLabel('Cidade'),
-                  _Field(key: TestKeys.businessCityField, controller: _cityCtrl, hint: 'Ex: Fortaleza'),
-                  const SizedBox(height: 24),
-                  _SectionHeader(icon: Icons.key_outlined, color: AppColors.accent2_700, label: 'Chave Pix'),
-                  const SizedBox(height: 12),
-                  const _FieldLabel('Telefone, CPF, e-mail ou aleatória'),
-                  _Field(
-                    key: TestKeys.businessPixKeyField,
-                    controller: _pixKeyCtrl,
-                    hint: 'CPF, CNPJ, telefone, e-mail ou chave aleatória',
-                    monospace: true,
-                  ),
-                  const SizedBox(height: 10),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-                    decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(3)),
-                    child: Row(
-                      children: [
-                        QrImageView(
-                          data: previewPayload,
-                          size: 44,
-                          backgroundColor: Colors.white,
-                          eyeStyle: const QrEyeStyle(color: AppColors.accent2_700),
-                          dataModuleStyle: const QrDataModuleStyle(color: AppColors.text),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            'Prévia do QR com os dados atuais. Ele é gerado no aparelho — nada sai do celular.',
-                            style: TextStyle(fontSize: 11.5, height: 1.45, color: AppColors.text.withValues(alpha: 0.72)),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                      decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(3)),
+                      child: Row(
+                        children: [
+                          QrImageView(
+                            data: previewPayload,
+                            size: 44,
+                            backgroundColor: Colors.white,
+                            eyeStyle: const QrEyeStyle(color: AppColors.accent2_700),
+                            dataModuleStyle: const QrDataModuleStyle(color: AppColors.text),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    child: Pressable(
-                      child: ElevatedButton(
-                        key: TestKeys.saveBusinessSettingsButton,
-                        onPressed: _valid ? () => _save(cubit) : null,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.accent,
-                          foregroundColor: AppColors.bg,
-                          disabledBackgroundColor: AppColors.accent.withValues(alpha: 0.45),
-                          disabledForegroundColor: AppColors.bg.withValues(alpha: 0.85),
-                          elevation: 0,
-                          padding: const EdgeInsets.symmetric(vertical: 13),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(3)),
-                          textStyle: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600),
-                        ),
-                        child: const Text('Salvar configurações'),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Prévia do QR com os dados atuais. Ele é gerado no aparelho — nada sai do celular.',
+                              style: TextStyle(fontSize: 11.5, height: 1.45, color: AppColors.text.withValues(alpha: 0.72)),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      child: Pressable(
+                        child: ElevatedButton(
+                          key: TestKeys.saveBusinessSettingsButton,
+                          onPressed: _valid ? () => _save(cubit) : null,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.accent,
+                            foregroundColor: AppColors.bg,
+                            disabledBackgroundColor: AppColors.accent.withValues(alpha: 0.45),
+                            disabledForegroundColor: AppColors.bg.withValues(alpha: 0.85),
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(vertical: 13),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(3)),
+                            textStyle: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600),
+                          ),
+                          child: const Text('Salvar configurações'),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
         ],
       ),
     );

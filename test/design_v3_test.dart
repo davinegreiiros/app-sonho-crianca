@@ -16,8 +16,16 @@ import 'package:sonho_de_crianca/test_keys.dart';
 import 'package:sonho_de_crianca/ui/features/app_shell/view_models/app_shell_cubit.dart';
 import 'package:sonho_de_crianca/widgets/category_icon.dart';
 
+import 'fakes/fake_business_settings.dart';
+
 Future<AppState> _pumpApp(WidgetTester tester, {RentalRepository? rentalRepository}) async {
-  await tester.pumpWidget(SonhoDeCriancaApp(rentalRepository: rentalRepository, startInPostoAdminMode: true));
+  final authRepository = fakeLoggedInAuthRepository();
+  await tester.pumpWidget(SonhoDeCriancaApp(
+    rentalRepository: rentalRepository,
+    authRepository: authRepository,
+    businessSettingsRepository: fakeBusinessSettingsRepository(authRepository: authRepository),
+    startInPostoAdminMode: true,
+  ));
   await tester.pump(const Duration(milliseconds: 400));
   return Provider.of<AppState>(tester.element(find.byType(MaterialApp)), listen: false);
 }

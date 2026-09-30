@@ -1,9 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 
+import '../data/repositories/auth_repository.dart';
 import '../data/repositories/business_settings_repository.dart';
 import '../data/repositories/rental_repository.dart';
 import '../data/repositories/toy_repository.dart';
+import '../data/services/api_client.dart';
+import '../data/services/business_settings_remote_service.dart';
 import '../data/services/local_rental_notifier.dart';
 import '../domain/formatters.dart';
 import '../domain/models/business_settings.dart';
@@ -58,7 +61,11 @@ class AppState extends ChangeNotifier {
     ToyRepository? toyRepository,
     RentalRepository? rentalRepository,
   })  : notifications = notifications ?? LocalRentalNotifier(),
-        _businessSettingsRepository = businessSettingsRepository ?? BusinessSettingsRepository(),
+        _businessSettingsRepository = businessSettingsRepository ??
+            BusinessSettingsRepository(
+              service: BusinessSettingsRemoteService(ApiClient()),
+              authRepository: AuthRepository(),
+            ),
         _ownsBusinessSettingsRepository = businessSettingsRepository == null,
         _toyRepository = toyRepository ?? ToyRepository(),
         _ownsToyRepository = toyRepository == null,

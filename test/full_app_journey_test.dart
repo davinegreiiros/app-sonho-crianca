@@ -29,6 +29,8 @@ import 'package:sonho_de_crianca/state/app_state.dart';
 import 'package:sonho_de_crianca/test_keys.dart';
 import 'package:sonho_de_crianca/ui/features/catalog/views/add_toy_sheet_view.dart';
 
+import 'fakes/fake_business_settings.dart';
+
 const _settle = Duration(milliseconds: 400);
 
 /// Several small pumps, not one big jump — some transitions (a pushed
@@ -49,7 +51,13 @@ Future<AppState> _pumpApp(WidgetTester tester, {RentalRepository? rentalReposito
   // real device fonts here), so off-screen content is handled per-tap
   // with `ensureVisible`/`scrollUntilVisible` instead, same as
   // `pix_flow_test.dart`/`catalog_tickets_test.dart` already do.
-  await tester.pumpWidget(SonhoDeCriancaApp(rentalRepository: rentalRepository, startInPostoAdminMode: true));
+  final authRepository = fakeLoggedInAuthRepository();
+  await tester.pumpWidget(SonhoDeCriancaApp(
+    rentalRepository: rentalRepository,
+    authRepository: authRepository,
+    businessSettingsRepository: fakeBusinessSettingsRepository(authRepository: authRepository),
+    startInPostoAdminMode: true,
+  ));
   await tester.pump(_settle);
   return Provider.of<AppState>(tester.element(find.byType(MaterialApp)), listen: false);
 }
