@@ -5,17 +5,23 @@ Princípios não-negociáveis do projeto. Toda spec, plano e tarefa deve respeit
 ## Stack
 
 - Flutter (Dart SDK ^3.12.2), Material.
-- State management: `provider` (ChangeNotifier em `lib/state/`). Não introduzir Riverpod/Bloc/GetX sem atualizar esta constitution primeiro.
+- State management: camada ViewModel usa `Cubit` (`flutter_bloc`), adotado em [specs/010-migracao-arquitetura-camadas](010-migracao-arquitetura-camadas/spec.md). `provider` continua em uso para injeção de dependência de Services/Repositories (`Provider`/`MultiProvider`); `Cubit`s são expostos pela árvore de widgets via `BlocProvider`/`MultiBlocProvider`. Não introduzir Bloc "evento puro" (event-based), Riverpod ou GetX sem atualizar esta constitution primeiro.
+- Comparação de igualdade das classes de estado do `Cubit`: `equatable`. Não usar `freezed`/`built_value` sem necessidade comprovada — evita dependência de codegen/`build_runner` (ver dúvida resolvida em specs/010).
 - Fontes: `google_fonts`. Ícones: `cupertino_icons` + assets próprios.
 
 ## Arquitetura
 
-- `lib/models/` — dados puros (Toy, Rental), sem lógica de UI.
-- `lib/state/` — `AppState` (ChangeNotifier), única fonte de verdade de estado de app.
-- `lib/screens/` — telas completas (rotas).
-- `lib/widgets/` — componentes reutilizáveis / dialogs / sheets.
-- `lib/theme/` — cores e tema centralizados. Nunca hardcode cor solta num widget — usar `AppColors`/`AppTheme`.
-- `lib/test_keys.dart` — `Key`s centralizadas para testes de widget/integration. Todo widget testável ganha chave aqui, não string solta no meio do código.
+Arquitetura em camadas, adotada em [specs/010-migracao-arquitetura-camadas](010-migracao-arquitetura-camadas/spec.md) e migrada de forma incremental, fatiada por feature (backlog em `specs/README.md`). Durante a transição, a estrutura antiga (`lib/models/`, `lib/state/`, `lib/screens/`, `lib/widgets/`) coexiste com a nova nas partes do app ainda não migradas — nenhuma spec de migração pode deixar o app quebrado no meio do caminho (regra de não-quebra).
+
+- `lib/data/services/` — classes stateless que encapsulam acesso externo (notificações locais, geração de payload PIX, etc.). Substituem `lib/notifications/*` e `lib/services/*` conforme migradas.
+- `lib/data/repositories/` — um repository por domínio (`ToyRepository`, `RentalRepository`, `BusinessSettingsRepository`), fonte única de verdade de dado/negócio daquele domínio, consumindo Services. Substituem o `AppState` único conforme migrados.
+- `lib/domain/models/` — modelos de domínio imutáveis (Toy, Rental, BusinessSettings), sem lógica de UI. Classes imutáveis escritas à mão, sem `freezed`/`built_value` — mesmo padrão que já existia em `lib/models/`. Substituem `lib/models/`.
+- `lib/domain/use_cases/` — só quando a lógica for complexa ou reusada por mais de um `Cubit` (ex.: cálculo de valor/tempo de locação, geração de payload PIX). CRUD simples vai direto Repository → Cubit, sem use case.
+- `lib/ui/core/` — widgets/tema genéricos e reutilizáveis entre features (sucessor de `lib/widgets/` + `lib/theme/` para o que não for específico de uma tela).
+- `lib/ui/features/<feature>/view_models/` — um `Cubit<EstadoDaTela>` por tela/feature, injetando Repository(s)/Use Case(s) via construtor. Substituem o acesso direto e amplo ao `AppState` global.
+- `lib/ui/features/<feature>/views/` — telas "burras", sucessoras de `lib/screens/*`, que só leem estado do `Cubit` (`BlocBuilder`/`BlocListener`/`BlocConsumer`) e disparam métodos dele, sem lógica de negócio inline.
+- `lib/theme/` — cores e tema centralizados enquanto não migrado para `lib/ui/core/`. Nunca hardcode cor solta num widget — usar `AppColors`/`AppTheme`.
+- `lib/test_keys.dart` — inalterado: `Key`s centralizadas para testes de widget/integration. Todo widget testável ganha chave aqui, não string solta no meio do código.
 
 ## Qualidade
 
@@ -41,10 +47,11 @@ Nada pode quebrar em hipótese nenhuma. Se a implementação de uma spec introdu
 
 ## Segurança (baseline)
 
-App é 100% local hoje: sem `INTERNET` permission, sem backend, sem persistência entre sessões. Isso é o piso de segurança a manter por padrão — qualquer spec que:
+App era 100% local até a spec [022-backend-sync-fundacao](022-backend-sync-fundacao/spec.md) (2026-08-25): a partir dela, dado passa a sair do aparelho pra um backend próprio (Next.js + MongoDB, repositório [sonho-de-crianca-backend](../../sonho-de-crianca-backend)), autenticado por operador (não mais "single-operador" — cada ação grava quem fez). Isso muda o piso de segurança que valia antes — ver o "Modelo de ameaça" da 022 pra lista completa, resumo abaixo. Dado de catálogo/locação continua também em SQLite local (`sqflite`, spec 020-persistencia-local) e `BusinessSettings` também em `SharedPreferences` **enquanto a fatia que troca pra HTTP não for implementada** (specs 023+) — v1 do backend é online-only (decisão registrada na 022), sem fila offline.
 
 - Adicione permissão nova (Android `AndroidManifest.xml` / iOS `Info.plist`) precisa justificar no `plan.md` por que é mínima e necessária.
 - Adicione persistência de dado pessoal (nome de criança, nome/telefone de responsável) precisa endereçar em `spec.md` onde o dado fica, por quanto tempo, e se é sensível o bastante pra precisar de criptografia em repouso.
-- Envie qualquer dado pra fora do dispositivo (rede, analytics, crash reporting) é tratada como mudança de alto risco — exige revisão de segurança dedicada antes do `plan.md`, ver [specs/002-seguranca-dados/spec.md](002-seguranca-dados/spec.md).
+- Envie qualquer dado pra fora do dispositivo (rede, analytics, crash reporting) é tratada como mudança de alto risco — exige revisão de segurança dedicada antes do `plan.md`. A dedicada pra "backend/rede" já existe ([specs/002-seguranca-dados/spec.md](002-seguranca-dados/spec.md) + [022-backend-sync-fundacao](022-backend-sync-fundacao/spec.md)) — qualquer spec nova que mexer nisso referencia as duas, não reabre a decisão.
+- Nenhuma chamada ao backend sem TLS. Nenhum JWT/senha de operador em log ou `print`/`debugPrint`.
 
 Regra geral: dado de criança/responsável nunca trafega pra fora do aparelho sem essa revisão explícita, e nunca aparece em log.

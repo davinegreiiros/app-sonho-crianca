@@ -7,7 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:sonho_de_crianca/main.dart';
-import 'package:sonho_de_crianca/models/rental.dart';
+import 'package:sonho_de_crianca/domain/models/rental.dart';
 import 'package:sonho_de_crianca/state/app_state.dart';
 import 'package:sonho_de_crianca/test_keys.dart';
 
@@ -78,7 +78,7 @@ void main() {
 
   group('customizable tempo-corrido rate', () {
     testWidgets('a custom rate overrides the catalog-derived one and is what actually charges', (tester) async {
-      await tester.pumpWidget(const SonhoDeCriancaApp());
+      await tester.pumpWidget(const SonhoDeCriancaApp(startInPostoAdminMode: true));
       await tester.pump(const Duration(milliseconds: 400));
       final state = Provider.of<AppState>(tester.element(find.byType(MaterialApp)), listen: false);
 
@@ -110,7 +110,7 @@ void main() {
     });
 
     testWidgets('without an override, the rate still falls back to the catalog default', (tester) async {
-      await tester.pumpWidget(const SonhoDeCriancaApp());
+      await tester.pumpWidget(const SonhoDeCriancaApp(startInPostoAdminMode: true));
       await tester.pump(const Duration(milliseconds: 400));
       final state = Provider.of<AppState>(tester.element(find.byType(MaterialApp)), listen: false);
 
@@ -125,7 +125,7 @@ void main() {
     });
 
     testWidgets('switching the toy clears a previously typed custom rate', (tester) async {
-      await tester.pumpWidget(const SonhoDeCriancaApp());
+      await tester.pumpWidget(const SonhoDeCriancaApp(startInPostoAdminMode: true));
       await tester.pump(const Duration(milliseconds: 400));
       final state = Provider.of<AppState>(tester.element(find.byType(MaterialApp)), listen: false);
 
@@ -141,7 +141,7 @@ void main() {
 
   group('open-ended rental flow', () {
     testWidgets('creating, then finishing, an open-ended rental charges the computed price', (tester) async {
-      await tester.pumpWidget(const SonhoDeCriancaApp());
+      await tester.pumpWidget(const SonhoDeCriancaApp(startInPostoAdminMode: true));
       await tester.pump(const Duration(milliseconds: 400));
       final state = Provider.of<AppState>(tester.element(find.byType(MaterialApp)), listen: false);
 
@@ -181,7 +181,7 @@ void main() {
     });
 
     testWidgets('Pix QR freezes the price — a slow-to-pay customer is not charged more', (tester) async {
-      await tester.pumpWidget(const SonhoDeCriancaApp());
+      await tester.pumpWidget(const SonhoDeCriancaApp(startInPostoAdminMode: true));
       await tester.pump(const Duration(milliseconds: 400));
       final state = Provider.of<AppState>(tester.element(find.byType(MaterialApp)), listen: false);
 
@@ -228,7 +228,7 @@ void main() {
     });
 
     testWidgets('cancelling an open-ended rental charges nothing', (tester) async {
-      await tester.pumpWidget(const SonhoDeCriancaApp());
+      await tester.pumpWidget(const SonhoDeCriancaApp(startInPostoAdminMode: true));
       await tester.pump(const Duration(milliseconds: 400));
       final state = Provider.of<AppState>(tester.element(find.byType(MaterialApp)), listen: false);
 
@@ -245,7 +245,7 @@ void main() {
     });
 
     testWidgets('"Nova locação" sheet toggles to tempo corrido and hides duration/price fields', (tester) async {
-      await tester.pumpWidget(const SonhoDeCriancaApp());
+      await tester.pumpWidget(const SonhoDeCriancaApp(startInPostoAdminMode: true));
       await tester.pump(const Duration(milliseconds: 400));
 
       await tester.tap(find.byKey(TestKeys.fabNewRental));

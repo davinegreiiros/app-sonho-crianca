@@ -12,7 +12,7 @@ void main() {
   SharedPreferences.setMockInitialValues({});
 
   testWidgets('App boots on the home tab', (WidgetTester tester) async {
-    await tester.pumpWidget(const SonhoDeCriancaApp());
+    await tester.pumpWidget(const SonhoDeCriancaApp(startInPostoAdminMode: true));
     await tester.pump();
 
     expect(find.text('Sonho de Criança'), findsOneWidget);

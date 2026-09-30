@@ -1,18 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../state/app_state.dart';
 import '../test_keys.dart';
 import '../theme/app_colors.dart';
+import '../ui/features/app_shell/view_models/app_shell_cubit.dart';
+import '../ui/features/app_shell/view_models/app_shell_state.dart';
+import '../ui/features/catalog/views/catalog_view.dart';
+import '../ui/features/home/views/home_view.dart';
+import '../ui/features/rental/views/active_tab_view.dart';
+import '../ui/features/report/views/report_view.dart';
 import '../widgets/animations/bounce.dart';
 import '../widgets/animations/pressable.dart';
 import '../widgets/app_bottom_nav.dart';
 import '../widgets/app_header.dart';
 import '../widgets/modal_launchers.dart';
-import 'tabs/active_tab.dart';
-import 'tabs/catalog_tab.dart';
-import 'tabs/home_tab.dart';
-import 'tabs/report_tab.dart';
 
 /// App scaffold: gradient header, tab body, bottom nav and the floating
 /// "+" action. The "nova locação" / "finalizar locação" flows are real
@@ -22,16 +23,16 @@ class HomeShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tab = context.select((AppState s) => s.tab);
+    final tab = context.select((AppShellCubit c) => c.state.tab);
 
     return Scaffold(
       backgroundColor: AppColors.bg,
       appBar: const AppHeader(),
       body: switch (tab) {
-        AppTab.home => const HomeTab(),
-        AppTab.active => const ActiveTab(),
-        AppTab.catalog => const CatalogTab(),
-        AppTab.report => const ReportTab(),
+        AppTab.home => const HomeView(),
+        AppTab.active => const ActiveTabView(),
+        AppTab.catalog => const CatalogView(),
+        AppTab.report => const ReportView(),
       },
       floatingActionButton: Bouncy(
         height: 4,

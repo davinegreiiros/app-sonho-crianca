@@ -7,12 +7,25 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:sonho_de_crianca/data/repositories/rental_repository.dart';
 import 'package:sonho_de_crianca/main.dart';
 import 'package:sonho_de_crianca/state/app_state.dart';
 import 'package:sonho_de_crianca/test_keys.dart';
 
+import 'fakes/fake_business_settings.dart';
+
 Future<AppState> _pumpApp(WidgetTester tester) async {
-  await tester.pumpWidget(const SonhoDeCriancaApp());
+  // Every scenario here finishes the seed's first active rental — needs
+  // the demo data (spec 020-persistencia-local: the real app's default
+  // RentalRepository starts empty, so tests that need `a1`-`a3` ask for
+  // it explicitly).
+  final authRepository = fakeLoggedInAuthRepository();
+  await tester.pumpWidget(SonhoDeCriancaApp(
+    rentalRepository: RentalRepository.withDemoSeed(),
+    authRepository: authRepository,
+    businessSettingsRepository: fakeBusinessSettingsRepository(authRepository: authRepository),
+    startInPostoAdminMode: true,
+  ));
   await tester.pump(const Duration(milliseconds: 400));
   return Provider.of<AppState>(tester.element(find.byType(MaterialApp)), listen: false);
 }

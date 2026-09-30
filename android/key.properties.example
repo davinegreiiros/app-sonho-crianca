@@ -1,0 +1,13 @@
+# Copie para android/key.properties (NUNCA commitar — já está no .gitignore)
+# e preencha com os dados da sua keystore de upload.
+#
+# Gerar a keystore (uma vez só; guarde o .jks e as senhas em lugar seguro —
+# perder a keystore impede publicar atualizações do app):
+#   keytool -genkey -v -keystore ~/sonho-de-crianca-upload.jks \
+#     -keyalg RSA -keysize 2048 -validity 10000 -alias upload
+#
+# storeFile é relativo a android/app/ (ou caminho absoluto).
+storePassword=
+keyPassword=
+keyAlias=upload
+storeFile=/caminho/absoluto/para/sonho-de-crianca-upload.jks

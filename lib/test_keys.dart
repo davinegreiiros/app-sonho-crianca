@@ -30,6 +30,7 @@ class TestKeys {
   static ValueKey toyCardKey(String toyId) => ValueKey('toy_card_$toyId');
   static const addToySubmitButton = ValueKey('add_toy_submit_button');
   static ValueKey categoryOption(String category) => ValueKey('category_option_$category');
+  static ValueKey toyIconOption(String key) => ValueKey('toy_icon_option_$key');
 
   static const rentalModeFixed = ValueKey('rental_mode_fixed');
   static const rentalModeOpenEnded = ValueKey('rental_mode_open_ended');
@@ -45,4 +46,23 @@ class TestKeys {
   static const pixTrocarFormaButton = ValueKey('pix_trocar_forma_button');
 
   static const settingsScreenBackButton = ValueKey('settings_screen_back_button');
+
+  // Posto do monitor / painel administrativo (spec 023-posto-monitor-painel)
+  static ValueKey postoRow(String toyId) => ValueKey('posto_row_$toyId');
+  static const postoNameField = ValueKey('posto_name_field');
+  static const postoEnterButton = ValueKey('posto_enter_button');
+  static const enterAdminButton = ValueKey('enter_admin_button');
+  static const exitPostoButton = ValueKey('exit_posto_button');
+  static const closeShiftButton = ValueKey('close_shift_button');
+  static const closingCashField = ValueKey('closing_cash_field');
+  static const confirmCloseShiftButton = ValueKey('confirm_close_shift_button');
+  static const adminPanelButton = ValueKey('admin_panel_button');
+  static const adminPanelBackButton = ValueKey('admin_panel_back_button');
+
+  // Login de operador (spec 024-sync-backend-fundacao)
+  static const loginUsernameField = ValueKey('login_username_field');
+  static const loginPasswordField = ValueKey('login_password_field');
+  static const loginSubmitButton = ValueKey('login_submit_button');
+  static const loginErrorText = ValueKey('login_error_text');
+  static const loginBackButton = ValueKey('login_back_button');
 }
