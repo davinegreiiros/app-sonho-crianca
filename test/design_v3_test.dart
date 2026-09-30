@@ -14,6 +14,7 @@ import 'package:sonho_de_crianca/domain/models/toy.dart';
 import 'package:sonho_de_crianca/state/app_state.dart';
 import 'package:sonho_de_crianca/test_keys.dart';
 import 'package:sonho_de_crianca/ui/features/app_shell/view_models/app_shell_cubit.dart';
+import 'package:sonho_de_crianca/ui/features/business_settings/view_models/business_settings_cubit.dart';
 import 'package:sonho_de_crianca/widgets/category_icon.dart';
 
 import 'fakes/fake_business_settings.dart';
@@ -95,4 +96,61 @@ void main() {
     }
     expect(find.byKey(TestKeys.businessNameField), findsNothing);
   });
+
+  testWidgets('reabrir Configurações na mesma sessão mostra o valor já salvo (spec 024, regressão)', (tester) async {
+    await _pumpApp(tester);
+    final cubit = BlocProvider.of<BusinessSettingsCubit>(tester.element(find.byType(MaterialApp)), listen: false);
+
+    await tester.tap(find.byKey(TestKeys.settingsGearButton));
+    for (var i = 0; i < 6; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    // Espera o `refresh()` do `initState` resolver de verdade antes de
+    // digitar — senão o `setState` que sincroniza os campos (spec 024)
+    // pode disparar *depois* que o teste já digitou, apagando o texto.
+    await _waitForSettingsForm(tester);
+
+    await tester.enterText(find.byKey(TestKeys.businessNameField), 'Sonho de Criança');
+    await tester.enterText(find.byKey(TestKeys.businessCityField), 'Fortaleza');
+    await tester.enterText(find.byKey(TestKeys.businessPixKeyField), '85999998888');
+    // A árvore só reflete os 3 `enterText` depois de um `pump()` — sem
+    // isso o hit-test do tap abaixo ainda vê o snapshot antigo do botão
+    // (desabilitado, de antes de preencher o último campo).
+    await tester.pump();
+    await tester.tap(find.byKey(TestKeys.saveBusinessSettingsButton));
+    // Poll em vez de contar frames no chute — o mesmo motivo do
+    // `_waitForSettingsForm`: `update()` tem mais de um hop assíncrono
+    // (otimista -> await PUT -> notifica de novo) antes do `_save` decidir
+    // fechar a tela.
+    for (var i = 0; i < 30 && find.byKey(TestKeys.businessNameField).evaluate().isNotEmpty; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    expect(find.byKey(TestKeys.businessNameField), findsNothing); // fechou depois de salvar
+    expect(cubit.state.settings.merchantName, 'Sonho de Criança');
+
+    // Reabre — mesmo Cubit/Repository do app inteiro (instância única),
+    // já `loaded` da vez anterior. `refresh()` pode resolver pro mesmo
+    // status de antes (sem "mudança" nenhuma) — os campos precisam vir
+    // preenchidos mesmo assim, não em branco.
+    await tester.tap(find.byKey(TestKeys.settingsGearButton));
+    for (var i = 0; i < 6; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    await _waitForSettingsForm(tester);
+
+    expect(find.text('Sonho de Criança'), findsOneWidget);
+  });
+}
+
+/// Espera o formulário de Configurações aparecer (sai do spinner de
+/// `firstLoadPending`) — o `setState` que sincroniza os campos e o que
+/// esconde o spinner são o mesmo bloco síncrono (spec 024), então "botão
+/// Salvar existe" é exatamente "campos já sincronizados". Mais confiável
+/// que contar frames no chute ou espiar `status` isolado (que pode virar
+/// `loaded` um microtask antes desse `setState` específico rodar).
+Future<void> _waitForSettingsForm(WidgetTester tester, {int maxTries = 30}) async {
+  for (var i = 0; i < maxTries; i++) {
+    if (find.byKey(TestKeys.saveBusinessSettingsButton).evaluate().isNotEmpty) return;
+    await tester.pump(const Duration(milliseconds: 50));
+  }
 }
