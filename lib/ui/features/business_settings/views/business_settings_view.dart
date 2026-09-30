@@ -59,8 +59,25 @@ class _BusinessSettingsViewState extends State<BusinessSettingsView> {
     // frame atual: chamar direto aqui notificaria (`Repository.load()`
     // seta `status = loading` e notifica antes de qualquer `await`) no
     // meio do build desta própria tela, o que o framework não permite.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) context.read<BusinessSettingsCubit>().refresh();
+    //
+    // Sincroniza os controllers no retorno deste mesmo `await`, não num
+    // listener de mudança de status: o Cubit é instância única do app, e
+    // numa segunda visita a Configurações na mesma sessão ele já nasce
+    // `loaded` (do fetch anterior) — `refresh()` pode resolver pro *mesmo*
+    // status de antes (sem "mudança" nenhuma pro listener notar), e os
+    // campos ficariam vazios pra sempre se a sincronização dependesse
+    // disso.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      final cubit = context.read<BusinessSettingsCubit>();
+      await cubit.refresh();
+      if (!mounted) return;
+      setState(() {
+        _nameCtrl.text = cubit.state.settings.merchantName;
+        _cityCtrl.text = cubit.state.settings.merchantCity;
+        _pixKeyCtrl.text = cubit.state.settings.pixKey;
+        _fieldsSynced = true;
+      });
     });
   }
 
@@ -95,26 +112,27 @@ class _BusinessSettingsViewState extends State<BusinessSettingsView> {
     final state = cubit.state;
 
     return BlocListener<BusinessSettingsCubit, BusinessSettingsState>(
-      listenWhen: (prev, curr) => prev.status != curr.status,
+      // Só a transição *pra* unauthorized importa aqui (sessão expirou em
+      // uso — spec 024 cenário 5); sincronização de campo não depende mais
+      // disso, ver `initState`.
+      listenWhen: (prev, curr) =>
+          prev.status != BusinessSettingsSyncStatus.unauthorized && curr.status == BusinessSettingsSyncStatus.unauthorized,
       listener: (context, state) {
-        if (!_fieldsSynced &&
-            state.status != BusinessSettingsSyncStatus.loading &&
-            state.status != BusinessSettingsSyncStatus.idle) {
-          _nameCtrl.text = state.settings.merchantName;
-          _cityCtrl.text = state.settings.merchantCity;
-          _pixKeyCtrl.text = state.settings.pixKey;
-          _fieldsSynced = true;
-        }
-        if (state.status == BusinessSettingsSyncStatus.unauthorized) {
-          Navigator.of(context).pop(BusinessSettingsExitReason.sessionExpired);
-        }
+        Navigator.of(context).pop(BusinessSettingsExitReason.sessionExpired);
       },
       child: _buildScaffold(context, cubit, state),
     );
   }
 
   Widget _buildScaffold(BuildContext context, BusinessSettingsCubit cubit, BusinessSettingsState state) {
-    final firstLoadPending = state.status == BusinessSettingsSyncStatus.loading && !_fieldsSynced;
+    // Não só `status == loading`: no primeiro frame desta tela o Cubit
+    // ainda está `idle` (o `refresh()` do `initState` só roda depois do
+    // frame, via `addPostFrameCallback`) — se o formulário aparecesse
+    // nesse instante (campos vazios/default, `_fieldsSynced` ainda falso),
+    // haveria uma janela pra digitar algo que o fetch, ao resolver logo
+    // depois, apagaria. `!_fieldsSynced` sozinho cobre `idle` e `loading`
+    // igual — só sai do spinner quando os campos já têm um valor definitivo.
+    final firstLoadPending = !_fieldsSynced;
 
     // Preview only — never persisted, never sent anywhere. Built from
     // whatever's typed so far, amount 0 (a placeholder charge amount is
