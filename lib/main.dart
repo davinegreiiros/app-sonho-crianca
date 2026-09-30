@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:provider/provider.dart';
 
+import 'data/repositories/auth_repository.dart';
 import 'data/repositories/business_settings_repository.dart';
 import 'data/repositories/rental_repository.dart';
 import 'data/repositories/toy_repository.dart';
 import 'data/repositories/turno_repository.dart';
+import 'data/services/api_client.dart';
 import 'data/services/app_database.dart';
+import 'data/services/business_settings_remote_service.dart';
 import 'data/services/rental_local_service.dart';
 import 'data/services/toy_local_service.dart';
 import 'data/services/turno_local_service.dart';
@@ -36,18 +39,26 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   final appDatabase = AppDatabase();
-  final businessSettingsRepository = BusinessSettingsRepository();
+  final authRepository = AuthRepository();
+  final businessSettingsRepository = BusinessSettingsRepository(
+    service: BusinessSettingsRemoteService(ApiClient()),
+    authRepository: authRepository,
+  );
   final toyRepository = ToyRepository(localService: ToyLocalService(appDatabase));
   final rentalRepository = RentalRepository(localService: RentalLocalService(appDatabase));
   final turnoRepository = TurnoRepository(localService: TurnoLocalService(appDatabase));
   await Future.wait([
-    businessSettingsRepository.load(),
+    // Só lê sessão salva localmente (sem rede) — `BusinessSettings` busca
+    // no backend sob demanda, quando a tela de Configurações abre de
+    // verdade (spec 024-sync-backend-fundacao), não aqui no boot.
+    authRepository.restoreSession(),
     toyRepository.load(),
     rentalRepository.load(),
     turnoRepository.load(),
   ]);
 
   runApp(SonhoDeCriancaApp(
+    authRepository: authRepository,
     businessSettingsRepository: businessSettingsRepository,
     toyRepository: toyRepository,
     rentalRepository: rentalRepository,
@@ -68,6 +79,7 @@ class SonhoDeCriancaApp extends StatelessWidget {
   /// sempre começa em 3a); ver `plan.md`/"Riscos" da spec.
   const SonhoDeCriancaApp({
     super.key,
+    this.authRepository,
     this.businessSettingsRepository,
     this.toyRepository,
     this.rentalRepository,
@@ -75,6 +87,7 @@ class SonhoDeCriancaApp extends StatelessWidget {
     this.startInPostoAdminMode = false,
   });
 
+  final AuthRepository? authRepository;
   final BusinessSettingsRepository? businessSettingsRepository;
   final ToyRepository? toyRepository;
   final RentalRepository? rentalRepository;
@@ -92,8 +105,15 @@ class SonhoDeCriancaApp extends StatelessWidget {
         // ChangeNotifierProvider (not plain Provider): both Repositories are
         // themselves ChangeNotifiers and provider asserts against exposing a
         // Listenable through a provider type that won't propagate updates.
+        ChangeNotifierProvider<AuthRepository>(
+          create: (_) => authRepository ?? AuthRepository(),
+        ),
         ChangeNotifierProvider<BusinessSettingsRepository>(
-          create: (_) => businessSettingsRepository ?? BusinessSettingsRepository(),
+          create: (context) => businessSettingsRepository ??
+              BusinessSettingsRepository(
+                service: BusinessSettingsRemoteService(ApiClient()),
+                authRepository: context.read<AuthRepository>(),
+              ),
         ),
         ChangeNotifierProvider<ToyRepository>(
           create: (_) => toyRepository ?? ToyRepository(),

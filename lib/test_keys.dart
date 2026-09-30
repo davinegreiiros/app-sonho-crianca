@@ -58,4 +58,11 @@ class TestKeys {
   static const confirmCloseShiftButton = ValueKey('confirm_close_shift_button');
   static const adminPanelButton = ValueKey('admin_panel_button');
   static const adminPanelBackButton = ValueKey('admin_panel_back_button');
+
+  // Login de operador (spec 024-sync-backend-fundacao)
+  static const loginUsernameField = ValueKey('login_username_field');
+  static const loginPasswordField = ValueKey('login_password_field');
+  static const loginSubmitButton = ValueKey('login_submit_button');
+  static const loginErrorText = ValueKey('login_error_text');
+  static const loginBackButton = ValueKey('login_back_button');
 }

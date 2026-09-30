@@ -47,5 +47,6 @@ Sem `spec.md` aprovado, sem código de feature. Bugfix simples e chore não prec
 | [021](021-migracao-shell-app/spec.md) | Migração: Shell do app (tab ativa, cabeçalho, nav) | Implemented | 019 |
 | [022](022-backend-sync-fundacao/spec.md) | Backend + sync entre aparelhos — fundação (spec guarda-chuva) | Implemented | 002, 020 |
 | [023](023-posto-monitor-painel/spec.md) | Posto do monitor + fechamento de turno + painel administrativo | Implemented | 010, 020 |
+| [024](024-sync-backend-fundacao/spec.md) | Sync com backend — login de operador + `BusinessSettings` via HTTP | Implemented | 022, backend#001 |
 
 Todas em `Draft` — cada uma tem "Dúvidas em aberto" que precisa de resposta sua antes de virar `Approved` e ganhar `plan.md`/`tasks.md`.
