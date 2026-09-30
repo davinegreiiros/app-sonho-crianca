@@ -10,7 +10,11 @@ import 'auth_repository.dart';
 /// 024-sync-backend-fundacao). Consumidores antigos (`AppState` proxy,
 /// telas ainda não migradas) ignoram isto e continuam lendo só `settings`,
 /// que nunca lança e sempre devolve o último valor conhecido.
-enum BusinessSettingsSyncStatus { idle, loading, loaded, unauthorized, networkError }
+///
+/// `serverError`: backend respondeu com erro não-401 (400/404/500) ou com
+/// corpo que não deu pra interpretar — distinto de `networkError` (nem
+/// chegou resposta), mas igualmente nunca deixa a tela presa em `loading`.
+enum BusinessSettingsSyncStatus { idle, loading, loaded, unauthorized, networkError, serverError }
 
 /// Single source of truth for `BusinessSettings` (spec
 /// 011-migracao-configuracoes-negocio; a partir da 024, sincronizado com o
@@ -65,6 +69,11 @@ class BusinessSettingsRepository extends ChangeNotifier {
       _status = BusinessSettingsSyncStatus.unauthorized;
     } on ApiNetworkException {
       _status = BusinessSettingsSyncStatus.networkError;
+    } catch (_) {
+      // `ApiException` (400/500) e erro de parse do corpo (`TypeError`/
+      // `FormatException`) — sem isto a exceção escapava, `status` ficava
+      // em `loading` e a tela de Configurações presa no spinner.
+      _status = BusinessSettingsSyncStatus.serverError;
     }
     if (!_disposed) notifyListeners();
   }
@@ -86,6 +95,11 @@ class BusinessSettingsRepository extends ChangeNotifier {
       _status = BusinessSettingsSyncStatus.unauthorized;
     } on ApiNetworkException {
       _status = BusinessSettingsSyncStatus.networkError;
+    } catch (_) {
+      // `ApiException` (400/500) e erro de parse do corpo (`TypeError`/
+      // `FormatException`) — sem isto a exceção escapava, `status` ficava
+      // em `loading` e a tela de Configurações presa no spinner.
+      _status = BusinessSettingsSyncStatus.serverError;
     }
     if (!_disposed) notifyListeners();
   }

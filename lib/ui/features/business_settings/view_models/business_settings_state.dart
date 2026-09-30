@@ -10,7 +10,8 @@ import '../../../../domain/models/business_settings.dart';
 /// `status` (spec 024-sync-backend-fundacao) espelha
 /// [BusinessSettingsSyncStatus] do Repository — a `View` usa pra saber se
 /// deve mostrar loading, voltar pro login (`unauthorized`) ou avisar sem
-/// conexão (`networkError`), sem precisar de um estado próprio pra isso.
+/// conexão (`networkError`) / erro do servidor (`serverError`), sem precisar
+/// de um estado próprio pra isso.
 class BusinessSettingsState extends Equatable {
   const BusinessSettingsState({required this.settings, this.status = BusinessSettingsSyncStatus.idle});
 

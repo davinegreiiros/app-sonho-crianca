@@ -6,6 +6,10 @@
          specs/002-seguranca-dados for why the extra permission was
          deliberately skipped). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- Backend de sync (specs/024-sync-backend-fundacao). Sem isto só o
+         build debug/profile (manifests próprios) alcança a API — o release
+         falharia toda chamada como "sem conexão". -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="sonho_de_crianca"
         android:name="${applicationName}"
