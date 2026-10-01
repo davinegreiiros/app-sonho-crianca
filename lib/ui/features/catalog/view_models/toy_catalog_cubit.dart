@@ -32,6 +32,11 @@ class ToyCatalogCubit extends Cubit<ToyCatalogState> {
   void _onRepositoriesChanged() =>
       emit(_compute(_toyRepository.toys, _rentalRepository.rentals, _computeToyAvailability));
 
+  /// Busca o catálogo atual no backend (spec 025) — chamado pela `View` ao
+  /// entrar na tela, não no boot do app (mesmo racional de
+  /// `BusinessSettingsCubit.refresh`).
+  Future<void> refreshCatalog() => _toyRepository.load();
+
   static ToyCatalogState _compute(List<Toy> toys, List<Rental> rentals, ComputeToyAvailability computeToyAvailability) {
     return ToyCatalogState(
       toys: toys,
@@ -39,7 +44,11 @@ class ToyCatalogCubit extends Cubit<ToyCatalogState> {
     );
   }
 
-  Toy addToy({
+  /// Cria o brinquedo no backend (spec 025) — deixa
+  /// `ApiUnauthorizedException`/`ApiNetworkException`/`ApiException` subir
+  /// pra View decidir a mensagem (mesmo padrão de `LoginCubit`/
+  /// `BusinessSettingsCubit`).
+  Future<Toy> addToy({
     required String name,
     required double price,
     required int blockMin,
@@ -59,16 +68,17 @@ class ToyCatalogCubit extends Cubit<ToyCatalogState> {
     );
   }
 
-  void updatePrice(String id, double price) => _toyRepository.updatePrice(id, price);
+  Future<void> updatePrice(String id, double price) => _toyRepository.updatePrice(id, price);
 
-  void updateBlockMinutes(String id, int blockMin) => _toyRepository.updateBlockMinutes(id, blockMin);
+  Future<void> updateBlockMinutes(String id, int blockMin) => _toyRepository.updateBlockMinutes(id, blockMin);
 
-  /// Refuses (returns false) if any rental — active or in history —
-  /// still references this toy, same guard `AppState.toyHasRentals` +
-  /// `AppState.removeToy` always applied.
-  bool removeToy(String id) {
+  /// Recusa local (devolve `false`) se alguma locação — ativa ou histórico
+  /// — ainda referencia este brinquedo, antes de gastar uma chamada de
+  /// rede; o backend aplica a mesma regra de verdade (spec 001, cenário 6,
+  /// 409) caso o dado local esteja desatualizado.
+  Future<bool> removeToy(String id) async {
     if (_rentalRepository.rentals.any((r) => r.toyId == id)) return false;
-    _toyRepository.remove(id);
+    await _toyRepository.remove(id);
     return true;
   }
 

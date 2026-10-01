@@ -11,7 +11,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'package:sonho_de_crianca/data/repositories/rental_repository.dart';
-import 'package:sonho_de_crianca/data/repositories/toy_repository.dart';
 import 'package:sonho_de_crianca/data/repositories/turno_repository.dart';
 import 'package:sonho_de_crianca/data/services/app_database.dart';
 import 'package:sonho_de_crianca/domain/formatters.dart';
@@ -23,6 +22,8 @@ import 'package:sonho_de_crianca/ui/features/admin_panel/view_models/admin_panel
 import 'package:sonho_de_crianca/ui/features/admin_panel/view_models/admin_panel_state.dart';
 import 'package:sonho_de_crianca/ui/features/posto/view_models/posto_session_cubit.dart';
 import 'package:sonho_de_crianca/ui/features/posto/view_models/posto_session_state.dart';
+
+import 'fakes/fake_toy_backend.dart';
 
 /// Multi-frame settle — mesmo padrão já usado em
 /// `full_app_journey_test.dart` (`_settleFrames`): navegação
@@ -315,7 +316,7 @@ void main() {
 
   test('PostoSessionCubit.openOrResume nunca abre 2 turnos pro mesmo toyId', () {
     final turnoRepository = TurnoRepository();
-    final cubit = PostoSessionCubit(ToyRepository(), RentalRepository(), turnoRepository);
+    final cubit = PostoSessionCubit(fakeToyRepository(), RentalRepository(), turnoRepository);
 
     cubit.openOrResume('cama', monitorName: 'Gustavo');
     cubit.exitToSelection();

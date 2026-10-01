@@ -41,6 +41,7 @@ class AuthRepository extends ChangeNotifier {
 
   Operator? _currentOperator;
   String? _token;
+  String? _deviceToken;
 
   /// Mesma guarda que os outros Repositories usam pro próprio `load()`
   /// assíncrono no boot resolver depois deste já ter sido descartado.
@@ -49,6 +50,15 @@ class AuthRepository extends ChangeNotifier {
   Operator? get currentOperator => _currentOperator;
   String? get token => _token;
   bool get isLoggedIn => _token != null && _currentOperator != null;
+
+  /// Sessão de dispositivo (spec 025-catalogo-sessao-dispositivo) — `null`
+  /// até [loginDevice] resolver, ou se a credencial não estiver configurada
+  /// nesta build. Separada da sessão de operador real acima: só serve pra
+  /// leitura de catálogo, nunca pra ação que grava autoria/dinheiro.
+  String? get deviceToken => _deviceToken;
+
+  static const _deviceUsername = String.fromEnvironment('DEVICE_OPERATOR_USERNAME');
+  static const _devicePassword = String.fromEnvironment('DEVICE_OPERATOR_PASSWORD');
 
   /// Lê a sessão salva, se houver — chamar uma vez no boot (`main.dart`),
   /// antes do `runApp`, mesmo padrão de `BusinessSettingsRepository.load()`.
@@ -76,6 +86,29 @@ class AuthRepository extends ChangeNotifier {
     _currentOperator = Operator.fromJson(response['operator'] as Map<String, dynamic>);
     await _persist();
     if (!_disposed) notifyListeners();
+  }
+
+  /// Login silencioso da sessão de dispositivo (spec 025) — chamar no boot
+  /// e de novo sempre que uma chamada de catálogo voltar com 401 (token de
+  /// 12h expirado). Credencial vem de constante de compilação
+  /// (`--dart-define-from-file=secrets.json`, nunca commitada); vazia =
+  /// build sem essa configuração, não tenta nada. Nunca lança — falha
+  /// (sem rede, credencial errada, backend fora) só deixa [deviceToken]
+  /// `null`; `ToyRepository.load()` já trata isso como cenário 4
+  /// (mantém o catálogo em cache, sem avisar ninguém).
+  Future<void> loginDevice() async {
+    if (_deviceUsername.isEmpty || _devicePassword.isEmpty) return;
+    try {
+      final response = await _apiClient.post(
+        '/api/auth/login',
+        body: {'username': _deviceUsername, 'password': _devicePassword},
+      );
+      _deviceToken = response['token'] as String;
+      if (!_disposed) notifyListeners();
+    } catch (_) {
+      // Sem usuário pra avisar aqui — quem depende de deviceToken trata o
+      // null como "sessão de dispositivo indisponível agora".
+    }
   }
 
   /// Encerra a sessão local — chamado pelo operador (logout explícito) ou

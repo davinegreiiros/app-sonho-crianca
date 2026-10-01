@@ -18,6 +18,7 @@ import 'package:sonho_de_crianca/ui/features/business_settings/view_models/busin
 import 'package:sonho_de_crianca/widgets/category_icon.dart';
 
 import 'fakes/fake_business_settings.dart';
+import 'fakes/fake_toy_backend.dart';
 
 Future<AppState> _pumpApp(WidgetTester tester, {RentalRepository? rentalRepository}) async {
   final authRepository = fakeLoggedInAuthRepository();
@@ -25,6 +26,10 @@ Future<AppState> _pumpApp(WidgetTester tester, {RentalRepository? rentalReposito
     rentalRepository: rentalRepository,
     authRepository: authRepository,
     businessSettingsRepository: fakeBusinessSettingsRepository(authRepository: authRepository),
+    // Catálogo (spec 025): `CatalogView` agora busca no backend ao abrir a
+    // aba — sem isto, cairia no `ToyRepository` real (produção) assim que
+    // qualquer teste deste arquivo visitasse a aba Catálogo.
+    toyRepository: fakeToyRepository(initial: kInitialToys, authRepository: authRepository),
     startInPostoAdminMode: true,
   ));
   await tester.pump(const Duration(milliseconds: 400));

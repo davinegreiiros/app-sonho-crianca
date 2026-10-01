@@ -6,16 +6,17 @@
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:sonho_de_crianca/data/repositories/rental_repository.dart';
-import 'package:sonho_de_crianca/data/repositories/toy_repository.dart';
 import 'package:sonho_de_crianca/domain/models/rental.dart';
 import 'package:sonho_de_crianca/ui/features/report/view_models/report_cubit.dart';
 import 'package:sonho_de_crianca/ui/features/report/view_models/report_state.dart';
+
+import 'fakes/fake_toy_backend.dart';
 
 void main() {
   group('ReportCubit', () {
     test('defaults to "today" and only counts rentals finished today', () {
       final rentalRepository = RentalRepository.withDemoSeed();
-      final cubit = ReportCubit(rentalRepository, ToyRepository());
+      final cubit = ReportCubit(rentalRepository, fakeToyRepository());
 
       // Seed: h1/h2/h3 finished "today" (todayAt helper), h4-h8 finished
       // 1+ days ago — only h1/h2/h3 should count for the default period.
@@ -28,7 +29,7 @@ void main() {
 
     test('setPeriod(all) includes every finished rental, none of the active ones', () {
       final rentalRepository = RentalRepository.withDemoSeed();
-      final cubit = ReportCubit(rentalRepository, ToyRepository());
+      final cubit = ReportCubit(rentalRepository, fakeToyRepository());
 
       cubit.setPeriod(ReportPeriod.all);
 
@@ -42,7 +43,7 @@ void main() {
 
     test('paymentBreakdown sums by method, toyBreakdown sums by toy, both over the filtered set', () {
       final rentalRepository = RentalRepository();
-      final cubit = ReportCubit(rentalRepository, ToyRepository());
+      final cubit = ReportCubit(rentalRepository, fakeToyRepository());
       cubit.setPeriod(ReportPeriod.all);
 
       final byMethod = cubit.state.paymentBreakdown;
@@ -62,7 +63,7 @@ void main() {
 
     test('reacts when RentalRepository changes elsewhere (shared instance)', () {
       final rentalRepository = RentalRepository();
-      final toyRepository = ToyRepository();
+      final toyRepository = fakeToyRepository();
       final cubit = ReportCubit(rentalRepository, toyRepository);
       cubit.setPeriod(ReportPeriod.all);
       final before = cubit.state.filteredCount;

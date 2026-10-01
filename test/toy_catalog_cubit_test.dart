@@ -1,17 +1,16 @@
-// Tests for spec 012 (migração — catálogo, criação de brinquedo) and
-// spec 015 (migração — catálogo, grade e disponibilidade): the
-// Repository/Cubit/Use Case are testable without a WidgetTester, and
-// stay in sync with AppState when Repository instances are shared — the
-// same bridge AppState relies on until catalog_view.dart's remaining
-// unmigrated neighbors (home_tab.dart, new_rental_sheet.dart) move in
-// fatia 016.
+// Tests for spec 012 (migração — catálogo, criação de brinquedo), spec
+// 015 (migração — catálogo, grade e disponibilidade) e spec 025 (catálogo
+// via backend + sessão de dispositivo): o Repository agora fala HTTP (via
+// `MockClient`, nenhum teste bate no backend real), mas a interface
+// pública de leitura/Cubit continua a mesma — e os dois seguem em
+// sincronia quando as instâncias são compartilhadas, mesma ponte que
+// AppState usa.
 
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:sonho_de_crianca/data/repositories/rental_repository.dart';
-import 'package:sonho_de_crianca/data/repositories/toy_repository.dart';
 import 'package:sonho_de_crianca/domain/models/rental.dart';
 import 'package:sonho_de_crianca/domain/models/toy.dart';
 import 'package:sonho_de_crianca/domain/use_cases/compute_toy_availability.dart';
@@ -21,21 +20,22 @@ import 'package:sonho_de_crianca/ui/features/catalog/view_models/toy_catalog_cub
 import 'package:sonho_de_crianca/ui/features/catalog/view_models/toy_catalog_state.dart';
 
 import 'fakes/fake_rental_notifier.dart';
+import 'fakes/fake_toy_backend.dart';
 
 void main() {
   SharedPreferences.setMockInitialValues({});
 
   group('ToyRepository', () {
     test('starts seeded from kInitialToys', () {
-      final repository = ToyRepository();
+      final repository = fakeToyRepository();
       expect(repository.toys, kInitialToys);
     });
 
-    test('addNew() appends a toy with a unique, non-colliding id', () {
-      final repository = ToyRepository();
+    test('addNew() appends a toy com o id que o backend devolveu', () async {
+      final repository = fakeToyRepository();
       final before = repository.toys.length;
 
-      final toy = repository.addNew(
+      final toy = await repository.addNew(
         name: 'Brinquedo Teste',
         price: 10,
         blockMin: 15,
@@ -45,16 +45,16 @@ void main() {
       );
 
       expect(repository.toys, hasLength(before + 1));
-      expect(toy.id, startsWith('custom_'));
       expect(kInitialToys.any((t) => t.id == toy.id), isFalse);
     });
 
-    test('updatePrice()/updateBlockMinutes() change only the matching toy', () {
-      final repository = ToyRepository();
+    test('updatePrice()/updateBlockMinutes() change only the matching toy', () async {
+      final repository = fakeToyRepository(initial: kInitialToys);
+      await repository.load();
       final target = repository.toys.first;
 
-      repository.updatePrice(target.id, 99);
-      repository.updateBlockMinutes(target.id, 42);
+      await repository.updatePrice(target.id, 99);
+      await repository.updateBlockMinutes(target.id, 42);
 
       final updated = repository.toys.firstWhere((t) => t.id == target.id);
       expect(updated.price, 99);
@@ -62,11 +62,12 @@ void main() {
       expect(repository.toys, hasLength(kInitialToys.length));
     });
 
-    test('remove() drops the toy unconditionally (the rentals guard lives in the Cubit)', () {
-      final repository = ToyRepository();
+    test('remove() drops the toy (o Cubit cuida da guarda de locação vinculada)', () async {
+      final repository = fakeToyRepository(initial: kInitialToys);
+      await repository.load();
       final target = repository.toys.first;
 
-      repository.remove(target.id);
+      await repository.remove(target.id);
 
       expect(repository.toys.any((t) => t.id == target.id), isFalse);
     });
@@ -91,7 +92,7 @@ void main() {
   group('ToyCatalogCubit', () {
     blocTest<ToyCatalogCubit, ToyCatalogState>(
       'addToy() persists through the Repository and emits the new state',
-      build: () => ToyCatalogCubit(ToyRepository(), RentalRepository()),
+      build: () => ToyCatalogCubit(fakeToyRepository(), RentalRepository()),
       act: (cubit) => cubit.addToy(
         name: 'Brinquedo Teste',
         price: 10,
@@ -107,7 +108,7 @@ void main() {
     );
 
     test('availabilityOf() matches the seed (a1/a2/a3 active against carrinho/pula/patinete)', () {
-      final cubit = ToyCatalogCubit(ToyRepository(), RentalRepository.withDemoSeed());
+      final cubit = ToyCatalogCubit(fakeToyRepository(), RentalRepository.withDemoSeed());
 
       final carrinho = cubit.state.toys.firstWhere((t) => t.id == 'carrinho'); // qty 2, 1 active (a1)
       final cama = cubit.state.toys.firstWhere((t) => t.id == 'cama'); // qty 1, 0 active
@@ -119,7 +120,7 @@ void main() {
     });
 
     test('reacts to a new rental in a shared RentalRepository (availability drops)', () {
-      final toyRepository = ToyRepository();
+      final toyRepository = fakeToyRepository();
       final rentalRepository = RentalRepository();
       final cubit = ToyCatalogCubit(toyRepository, rentalRepository);
       final cama = cubit.state.toys.firstWhere((t) => t.id == 'cama');
@@ -141,16 +142,16 @@ void main() {
       cubit.close();
     });
 
-    test('removeToy() refuses a toy with any rental (active or done), succeeds otherwise', () {
-      final toyRepository = ToyRepository();
+    test('removeToy() refuses a toy with any rental (active or done), succeeds otherwise', () async {
+      final toyRepository = fakeToyRepository();
       final rentalRepository = RentalRepository.withDemoSeed();
       final cubit = ToyCatalogCubit(toyRepository, rentalRepository);
 
       // 'carrinho' has rentals in the seed (a1 active, h1/h6 done).
-      expect(cubit.removeToy('carrinho'), isFalse);
+      expect(await cubit.removeToy('carrinho'), isFalse);
       expect(cubit.state.toys.any((t) => t.id == 'carrinho'), isTrue);
 
-      final toy = cubit.addToy(
+      final toy = await cubit.addToy(
         name: 'Sem Locação',
         price: 10,
         blockMin: 15,
@@ -158,14 +159,14 @@ void main() {
         imageKey: 'outro',
         category: ToyCategory.outro,
       );
-      expect(cubit.removeToy(toy.id), isTrue);
+      expect(await cubit.removeToy(toy.id), isTrue);
       expect(cubit.state.toys.any((t) => t.id == toy.id), isFalse);
 
       cubit.close();
     });
 
-    test('shares state with AppState.toys when the same Repositories are injected', () {
-      final toyRepository = ToyRepository();
+    test('shares state with AppState.toys when the same Repositories are injected', () async {
+      final toyRepository = fakeToyRepository();
       final rentalRepository = RentalRepository();
       final cubit = ToyCatalogCubit(toyRepository, rentalRepository);
       final state = AppState(
@@ -174,7 +175,7 @@ void main() {
         rentalRepository: rentalRepository,
       );
 
-      final toy = cubit.addToy(
+      final toy = await cubit.addToy(
         name: 'Brinquedo Teste',
         price: 10,
         blockMin: 15,

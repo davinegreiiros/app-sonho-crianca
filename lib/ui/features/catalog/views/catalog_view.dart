@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../data/services/api_exceptions.dart';
 import '../../../../domain/models/toy.dart';
 import '../../../../test_keys.dart';
 import '../../../../theme/app_colors.dart';
 import '../../../../widgets/animations/cascade.dart';
 import '../../../../widgets/animations/pressable.dart';
+import '../../../../widgets/auth_gate.dart';
 import '../../../../widgets/category_icon.dart';
 import '../../../../widgets/modal_launchers.dart';
 import '../../../../widgets/toy_icon.dart';
@@ -38,6 +40,18 @@ class _CatalogViewState extends State<CatalogView> with TickerProviderStateMixin
       _lastCount = count;
     }
     return _cascade!;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // Busca o catálogo no backend toda vez que a aba abre (spec 025,
+    // cenário 2) — não no boot do app. Agendado pro fim do frame atual,
+    // mesmo motivo de `BusinessSettingsView.initState`: chamar direto
+    // aqui notificaria em pleno build desta própria tela.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<ToyCatalogCubit>().refreshCatalog();
+    });
   }
 
   @override
@@ -185,9 +199,14 @@ class _ToyCard extends StatelessWidget {
                         label: 'PREÇO R\$',
                         color: toy.ink.fg,
                         initial: toy.price.toStringAsFixed(0),
-                        onChanged: (v) {
+                        onChanged: (v) async {
                           final n = double.tryParse(v);
-                          if (n != null) cubit.updatePrice(toy.id, n);
+                          if (n == null) return;
+                          try {
+                            await cubit.updatePrice(toy.id, n);
+                          } catch (e) {
+                            if (context.mounted) _showToyActionError(context, e);
+                          }
                         },
                       ),
                     ),
@@ -197,9 +216,14 @@ class _ToyCard extends StatelessWidget {
                         label: 'MINUTOS',
                         color: toy.ink.fg,
                         initial: '${toy.blockMin}',
-                        onChanged: (v) {
+                        onChanged: (v) async {
                           final n = int.tryParse(v);
-                          if (n != null && n > 0) cubit.updateBlockMinutes(toy.id, n);
+                          if (n == null || n <= 0) return;
+                          try {
+                            await cubit.updateBlockMinutes(toy.id, n);
+                          } catch (e) {
+                            if (context.mounted) _showToyActionError(context, e);
+                          }
                         },
                       ),
                     ),
@@ -360,20 +384,46 @@ class _HalftonePainter extends CustomPainter {
   bool shouldRepaint(covariant _HalftonePainter oldDelegate) => oldDelegate.dotColor != dotColor;
 }
 
-void _confirmRemove(BuildContext context, ToyCatalogCubit cubit, Toy toy) {
-  final removed = cubit.removeToy(toy.id);
+Future<void> _confirmRemove(BuildContext context, ToyCatalogCubit cubit, Toy toy) async {
+  try {
+    final removed = await cubit.removeToy(toy.id);
+    if (!context.mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          removed
+              ? '${toy.name} removido do catálogo.'
+              : '${toy.name} tem locações registradas — não dá pra remover.',
+        ),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  } catch (e) {
+    if (context.mounted) _showToyActionError(context, e);
+  }
+}
+
+/// Mensagem por tipo de erro (spec 025): sessão de operador real ausente
+/// ganha ação "Entrar"; o resto mostra a mensagem do próprio erro — pro
+/// 409 do backend (brinquedo com locação vinculada), isso já é o texto de
+/// negócio pronto, não precisa duplicar aqui.
+void _showToyActionError(BuildContext context, Object error) {
   final messenger = ScaffoldMessenger.of(context);
   messenger.hideCurrentSnackBar();
-  messenger.showSnackBar(
-    SnackBar(
-      content: Text(
-        removed
-            ? '${toy.name} removido do catálogo.'
-            : '${toy.name} tem locações registradas — não dá pra remover.',
+  if (error is ApiUnauthorizedException) {
+    messenger.showSnackBar(
+      SnackBar(
+        content: const Text('Faça login para editar o catálogo.'),
+        duration: const Duration(seconds: 4),
+        action: SnackBarAction(label: 'Entrar', onPressed: () => ensureOperatorSession(context)),
       ),
-      duration: const Duration(seconds: 2),
-    ),
-  );
+    );
+    return;
+  }
+  final message = error is ApiNetworkException || error is ApiException ? error.toString() : 'Não foi possível salvar. Tenta de novo.';
+  messenger.showSnackBar(SnackBar(content: Text(message), duration: const Duration(seconds: 3)));
 }
 
 class _MiniField extends StatefulWidget {
@@ -401,6 +451,19 @@ class _MiniFieldState extends State<_MiniField> {
   void _onFocusChange() {
     setState(() => _focused = _focus.hasFocus);
     if (!_focus.hasFocus) widget.onChanged(_controller.text);
+  }
+
+  @override
+  void didUpdateWidget(_MiniField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Sincroniza com o valor "de verdade" quando não é o próprio campo em
+    // edição — cobre duas situações (spec 025): a escrita falhou e
+    // `ToyRepository` desfez a mudança otimista, ou outro aparelho mudou o
+    // valor enquanto esta tela já estava aberta (cenário 2). Nunca
+    // sobrescreve o que o operador está digitando agora.
+    if (!_focused && widget.initial != oldWidget.initial) {
+      _controller.text = widget.initial;
+    }
   }
 
   @override
