@@ -9,6 +9,8 @@ import '../../../../theme/app_colors.dart';
 import '../../../../widgets/animations/bounce.dart';
 import '../../../../widgets/animations/print_strip.dart';
 import '../../../../widgets/animations/pressable.dart';
+import '../../app_shell/view_models/app_shell_cubit.dart';
+import '../../app_shell/view_models/app_shell_state.dart';
 import '../view_models/business_settings_cubit.dart';
 import '../view_models/business_settings_state.dart';
 
@@ -300,6 +302,32 @@ class _BusinessSettingsViewState extends State<BusinessSettingsView> {
                             ),
                           ),
                         ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    _SectionHeader(icon: Icons.toys_outlined, color: AppColors.accent700, label: 'Postos'),
+                    const SizedBox(height: 10),
+                    Text(
+                      'Adicionar, editar ou remover brinquedo — cada um vira um posto na tela de abrir turno.',
+                      style: TextStyle(fontSize: 12, color: AppColors.text.withValues(alpha: 0.65)),
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        key: TestKeys.manageToysButton,
+                        onPressed: () {
+                          context.read<AppShellCubit>().setTab(AppTab.catalog);
+                          Navigator.of(context).pop();
+                        },
+                        icon: const Icon(Icons.edit_outlined, size: 17),
+                        label: const Text('Gerenciar brinquedos'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.text,
+                          side: BorderSide(color: AppColors.text.withValues(alpha: 0.18)),
+                          padding: const EdgeInsets.symmetric(vertical: 13),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(3)),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 24),

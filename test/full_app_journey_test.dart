@@ -148,6 +148,11 @@ void main() {
       await tester.enterText(find.byKey(TestKeys.businessCityField), 'Fortaleza');
       await tester.enterText(find.byKey(TestKeys.businessPixKeyField), '85999998888');
       await tester.pump();
+      // Mesmo motivo do `design_v3_test.dart`: a seção "Postos" empurrou o
+      // botão de salvar abaixo da viewport de teste — `ensureVisible`
+      // sozinho não traz a base dele pra dentro.
+      await tester.drag(find.byType(Scrollable).first, const Offset(0, -200));
+      await tester.pump();
       await tester.tap(find.byKey(TestKeys.saveBusinessSettingsButton));
       await _settleFrames(tester);
 

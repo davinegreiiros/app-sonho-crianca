@@ -9,9 +9,15 @@ import '../../../../domain/models/toy.dart';
 /// fechamento em `CloseShiftView`).
 typedef TurnoRow = ({Toy toy, String monitorName, int locCount, double gross, bool isOpen, double? diff});
 
-/// One entry in the read-only trilha de lançamentos (3d) — a finished
-/// rental, most recent first.
-typedef TrailEntry = ({Toy toy, Rental rental});
+/// Tipo de evento da trilha (3d) — só o que o app faz de verdade hoje
+/// (spec 023: criar e encerrar locação; cancelar ainda apaga sem rastro).
+enum TrailAction { created, finished }
+
+/// One entry in the read-only trilha de lançamentos (3d) — um evento
+/// (criação ou encerramento) de uma locação, most recent first. [at] e
+/// [actor] já vêm resolvidos pela ação (`startedAt`/`createdByMonitorName`
+/// ou `endedAt`/`finishedByMonitorName`); `actor == null` = administrador.
+typedef TrailEntry = ({Toy toy, Rental rental, TrailAction action, DateTime at, String? actor});
 
 /// State emitted by `AdminPanelCubit` (spec 023-posto-monitor-painel,
 /// view 3d) — totais de hoje, uma linha por turno, trilha de lançamentos.

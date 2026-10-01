@@ -141,6 +141,12 @@ void main() {
     // isso o hit-test do tap abaixo ainda vê o snapshot antigo do botão
     // (desabilitado, de antes de preencher o último campo).
     await tester.pump();
+    // `ensureVisible` só garante a borda de cima do botão dentro da
+    // viewport de teste — a seção "Postos" (atalho pro Catálogo) empurrou
+    // o botão pra baixo o bastante que a base dele ainda ficava fora,
+    // então o tap errava o alvo; arrasto manual garante margem de sobra.
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, -200));
+    await tester.pump();
     await tester.tap(find.byKey(TestKeys.saveBusinessSettingsButton));
     // Poll em vez de contar frames no chute — o mesmo motivo do
     // `_waitForSettingsForm`: `update()` tem mais de um hop assíncrono

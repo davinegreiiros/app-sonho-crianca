@@ -14,10 +14,13 @@ class FloatingConfetti extends StatefulWidget {
   State<FloatingConfetti> createState() => _FloatingConfettiState();
 }
 
-class _FloatingConfettiState extends State<FloatingConfetti> with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(seconds: 6))
-    ..repeat();
-  late final List<_Particle> _particles = List.generate(widget.count, (i) => _Particle(i, widget.count));
+class _FloatingConfettiState extends State<FloatingConfetti>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c =
+      AnimationController(vsync: this, duration: const Duration(seconds: 6))
+        ..repeat();
+  late final List<_Particle> _particles =
+      List.generate(widget.count, (i) => _Particle(i, widget.count));
 
   @override
   void dispose() {
@@ -34,7 +37,8 @@ class _FloatingConfettiState extends State<FloatingConfetti> with SingleTickerPr
             animation: _c,
             builder: (context, _) => Stack(
               children: [
-                for (final p in _particles) p.build(context, constraints.biggest, _c.value),
+                for (final p in _particles)
+                  p.build(context, constraints.biggest, _c.value),
               ],
             ),
           );
@@ -44,7 +48,11 @@ class _FloatingConfettiState extends State<FloatingConfetti> with SingleTickerPr
   }
 }
 
-const _kConfettiColors = [Color(0xFF0088B0), Color(0xFFD6006C), Color(0xFFEDBB00)];
+const _kConfettiColors = [
+  Color(0xFF0088B0),
+  Color(0xFFD6006C),
+  Color(0xFFEDBB00)
+];
 
 class _Particle {
   _Particle(int index, int total)
@@ -61,7 +69,8 @@ class _Particle {
   Widget build(BuildContext context, Size area, double t) {
     final local = (t + phase) % 1.0;
     final y = area.height * (1 - local);
-    final opacity = local < 0.15 ? local / 0.15 : (local > 0.85 ? (1 - local) / 0.15 : 1.0);
+    final opacity =
+        local < 0.15 ? local / 0.15 : (local > 0.85 ? (1 - local) / 0.15 : 1.0);
     return Positioned(
       left: area.width * xFrac,
       top: y,

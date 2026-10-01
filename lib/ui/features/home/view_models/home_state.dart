@@ -14,6 +14,7 @@ class HomeState extends Equatable {
     required this.doneTodayCount,
     required this.homeTotalToday,
     required this.toys,
+    required this.now,
   });
 
   /// Active + finished-today rentals, most recent first, capped at 4 —
@@ -30,8 +31,13 @@ class HomeState extends Equatable {
   /// `AppState.toyById` always had.
   final List<Toy> toys;
 
+  /// Clock snapshot from the last emit — keeps the 1s ticker's re-emit from
+  /// being `==` to the previous state (and dropped), so "há N min" labels
+  /// actually refresh. See `ActiveRentalsState.now`.
+  final DateTime now;
+
   Toy toyById(String id) => toys.firstWhere((t) => t.id == id, orElse: () => toys.first);
 
   @override
-  List<Object?> get props => [recentActivity, activeCount, availableCount, doneTodayCount, homeTotalToday, toys];
+  List<Object?> get props => [recentActivity, activeCount, availableCount, doneTodayCount, homeTotalToday, toys, now];
 }

@@ -75,6 +75,18 @@ void main() {
       cubit.close();
     });
 
+    test('1s ticker emits a new state even when the rental list is unchanged', () async {
+      final cubit = ActiveRentalsCubit(fakeToyRepository(), _seededRepository(), notifications: FakeRentalNotifier());
+      final emitted = <Object>[];
+      final sub = cubit.stream.listen(emitted.add);
+
+      await Future<void>.delayed(const Duration(milliseconds: 1100));
+
+      expect(emitted, isNotEmpty);
+      await sub.cancel();
+      await cubit.close();
+    });
+
     test('extendActive() grows duration/price and reschedules notifications', () async {
       final rentalRepository = _seededRepository();
       final notifier = FakeRentalNotifier();

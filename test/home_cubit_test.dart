@@ -27,6 +27,18 @@ void main() {
       cubit.close();
     });
 
+    test('1s ticker emits a new state even when nothing else changed', () async {
+      final cubit = HomeCubit(fakeToyRepository(), fakeSeededRentalRepository());
+      final emitted = <Object>[];
+      final sub = cubit.stream.listen(emitted.add);
+
+      await Future<void>.delayed(const Duration(milliseconds: 1100));
+
+      expect(emitted, isNotEmpty);
+      await sub.cancel();
+      await cubit.close();
+    });
+
     test('recentActivity mixes active + done-today, most recent first, capped at 4', () {
       final cubit = HomeCubit(fakeToyRepository(), fakeSeededRentalRepository());
 

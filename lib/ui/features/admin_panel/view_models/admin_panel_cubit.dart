@@ -45,7 +45,13 @@ class AdminPanelCubit extends Cubit<AdminPanelState> {
 
     final totalGrossToday = doneToday.fold(0.0, (a, r) => a + r.price);
 
-    final trail = [...doneToday]..sort((a, b) => b.endedAt!.compareTo(a.endedAt!));
+    final trail = <TrailEntry>[
+      for (final r in rentals)
+        if (!r.startedAt.isBefore(startOfDay))
+          (toy: _toyById(toys, r.toyId), rental: r, action: TrailAction.created, at: r.startedAt, actor: r.createdByMonitorName),
+      for (final r in doneToday)
+        (toy: _toyById(toys, r.toyId), rental: r, action: TrailAction.finished, at: r.endedAt!, actor: r.finishedByMonitorName),
+    ]..sort((a, b) => b.at.compareTo(a.at));
 
     final turnosToday = turnos.where((t) => !t.openedAt.isBefore(startOfDay)).toList()..sort((a, b) => b.openedAt.compareTo(a.openedAt));
 
@@ -57,7 +63,8 @@ class AdminPanelCubit extends Cubit<AdminPanelState> {
             r.isCompleted &&
             r.endedAt != null &&
             !r.endedAt!.isBefore(turno.openedAt) &&
-            !r.endedAt!.isAfter(windowEnd),
+            !r.endedAt!.isAfter(windowEnd) &&
+            r.finishedByMonitorName == turno.monitorName,
       );
       final gross = inTurno.fold(0.0, (a, r) => a + r.price);
       double? diff;
@@ -79,7 +86,7 @@ class AdminPanelCubit extends Cubit<AdminPanelState> {
       totalGrossToday: totalGrossToday,
       totalLocToday: doneToday.length,
       turnRows: turnRows,
-      trail: trail.map((r) => (toy: _toyById(toys, r.toyId), rental: r)).toList(),
+      trail: trail,
     );
   }
 

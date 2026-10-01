@@ -82,28 +82,39 @@ class PostoSessionCubit extends Cubit<PostoSessionState> {
 
   /// Abre o passo de conferência de caixa (3c): calcula o esperado por
   /// forma de pagamento a partir das locações encerradas neste turno
-  /// (mesmo `toyId`, `endedAt` dentro de `[turnoOpenedAt, agora]`).
+  /// (mesmo `toyId`, `endedAt` dentro de `[turnoOpenedAt, agora]`, e
+  /// encerradas pelo próprio monitor do turno — encerramento feito pelo
+  /// administrador ou outra pessoa não entra no caixa dele).
   void beginClosing() {
     final toyId = state.toyId;
     final openedAt = state.turnoOpenedAt;
-    if (toyId == null || openedAt == null) return;
+    final monitorName = state.monitorName;
+    if (toyId == null || openedAt == null || monitorName == null) return;
     final finished = _rentalRepository.rentals.where(
-      (r) => r.toyId == toyId && r.status == RentalStatus.done && r.endedAt != null && !r.endedAt!.isBefore(openedAt),
+      (r) =>
+          r.toyId == toyId &&
+          r.status == RentalStatus.done &&
+          r.endedAt != null &&
+          !r.endedAt!.isBefore(openedAt) &&
+          r.finishedByMonitorName == monitorName,
     );
     final expected = <PaymentMethod, double>{
       for (final m in PaymentMethod.values) m: finished.where((r) => r.paymentMethod == m).fold(0.0, (a, r) => a + r.price),
     };
-    emit(state.copyWith(closingExpectedByMethod: expected, closingCountedCashInput: ''));
+    emit(state.copyWith(closingExpectedByMethod: expected, closingCountedCashInput: '', closingLocCount: finished.length));
   }
 
   void setClosingCountedCash(String raw) => emit(state.copyWith(closingCountedCashInput: raw));
 
   /// Confirma o fechamento do turno atual e volta pra 3a (posto livre de
-  /// novo).
+  /// novo). Não fecha com o campo de dinheiro vazio/inválido — gravaria
+  /// uma falta inventada num turno que não pode mais ser corrigido; `0`
+  /// digitado explicitamente vale.
   void confirmCloseTurno() {
     final turnoId = state.turnoId;
-    if (turnoId == null) return;
-    _turnoRepository.close(turnoId, countedCash: state.closingCountedCash ?? 0);
+    final countedCash = state.closingCountedCash;
+    if (turnoId == null || countedCash == null) return;
+    _turnoRepository.close(turnoId, countedCash: countedCash);
     exitToSelection();
   }
 
