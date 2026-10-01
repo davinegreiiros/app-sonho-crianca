@@ -34,13 +34,15 @@ class ActiveRentalsCubit extends Cubit<ActiveRentalsState> {
           endPayment: null,
           endShowPixQr: false,
           endFrozenPrice: null,
+          now: DateTime.now(),
         )) {
     _rentalRepository.addListener(_onRentalsChanged);
     // Countdown/overtime displays derive their text straight from
     // `DateTime.now()` at build time — nothing about them lives in this
     // Cubit's state — so a plain per-second re-emit is what makes the
     // View rebuild and re-read the clock, same role `AppState._ticker`
-    // already played for this exact screen.
+    // already played for this exact screen. `now` goes into the state so
+    // the re-emit isn't deduplicated away by Equatable.
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) => _onRentalsChanged());
   }
 
@@ -52,7 +54,7 @@ class ActiveRentalsCubit extends Cubit<ActiveRentalsState> {
 
   static List<Rental> _activeOf(List<Rental> rentals) => rentals.where((r) => r.status == RentalStatus.active).toList();
 
-  void _onRentalsChanged() => emit(state.copyWith(activeRentals: _activeOf(_rentalRepository.rentals)));
+  void _onRentalsChanged() => emit(state.copyWith(activeRentals: _activeOf(_rentalRepository.rentals), now: DateTime.now()));
 
   Toy toyById(String id) => _toyRepository.toys.firstWhere((t) => t.id == id, orElse: () => _toyRepository.toys.first);
 

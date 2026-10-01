@@ -14,6 +14,7 @@ class ActiveRentalsState extends Equatable {
     required this.endPayment,
     required this.endShowPixQr,
     required this.endFrozenPrice,
+    required this.now,
   });
 
   final List<Rental> activeRentals;
@@ -22,6 +23,13 @@ class ActiveRentalsState extends Equatable {
   final PaymentMethod? endPayment;
   final bool endShowPixQr;
   final double? endFrozenPrice;
+
+  /// Clock snapshot from the last emit. Countdown text is derived from
+  /// `DateTime.now()` at build time, but `Rental` has no value equality and
+  /// the list itself doesn't change between ticks — without this field the
+  /// per-second re-emit would be `==` to the previous state and `Cubit.emit`
+  /// would drop it, freezing every timer on screen.
+  final DateTime now;
 
   /// The rental the "Finalizar locação" dialog is currently open for, if
   /// any — looked up fresh from [activeRentals] each time, same as
@@ -41,6 +49,7 @@ class ActiveRentalsState extends Equatable {
     Object? endPayment = _unset,
     bool? endShowPixQr,
     Object? endFrozenPrice = _unset,
+    DateTime? now,
   }) {
     return ActiveRentalsState(
       activeRentals: activeRentals ?? this.activeRentals,
@@ -48,11 +57,12 @@ class ActiveRentalsState extends Equatable {
       endPayment: identical(endPayment, _unset) ? this.endPayment : endPayment as PaymentMethod?,
       endShowPixQr: endShowPixQr ?? this.endShowPixQr,
       endFrozenPrice: identical(endFrozenPrice, _unset) ? this.endFrozenPrice : endFrozenPrice as double?,
+      now: now ?? this.now,
     );
   }
 
   static const _unset = Object();
 
   @override
-  List<Object?> get props => [activeRentals, endingId, endPayment, endShowPixQr, endFrozenPrice];
+  List<Object?> get props => [activeRentals, endingId, endPayment, endShowPixQr, endFrozenPrice, now];
 }
