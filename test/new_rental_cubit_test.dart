@@ -7,13 +7,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:sonho_de_crianca/data/repositories/rental_repository.dart';
-import 'package:sonho_de_crianca/data/repositories/toy_repository.dart';
 import 'package:sonho_de_crianca/domain/models/rental.dart';
 import 'package:sonho_de_crianca/domain/use_cases/schedule_rental_end_notifications.dart';
 import 'package:sonho_de_crianca/state/app_state.dart';
 import 'package:sonho_de_crianca/ui/features/rental/view_models/new_rental_cubit.dart';
 
 import 'fakes/fake_rental_notifier.dart';
+import 'fakes/fake_toy_backend.dart';
 
 void main() {
   // AppState() loads business Pix settings via SharedPreferences (spec
@@ -48,7 +48,7 @@ void main() {
     test('schedules both notifications for a fixed-duration rental', () {
       const scheduleNotifications = ScheduleRentalEndNotifications();
       final notifier = FakeRentalNotifier();
-      final toy = ToyRepository().toys.firstWhere((t) => t.id == 'carrinho');
+      final toy = fakeToyRepository().toys.firstWhere((t) => t.id == 'carrinho');
       final rental = Rental(
         id: 'r-notif-test',
         toyId: toy.id,
@@ -69,7 +69,7 @@ void main() {
     test('is a no-op for an open-ended rental', () {
       const scheduleNotifications = ScheduleRentalEndNotifications();
       final notifier = FakeRentalNotifier();
-      final toy = ToyRepository().toys.firstWhere((t) => t.id == 'carrinho');
+      final toy = fakeToyRepository().toys.firstWhere((t) => t.id == 'carrinho');
       final rental = Rental(
         id: 'r-open-ended-test',
         toyId: toy.id,
@@ -91,7 +91,7 @@ void main() {
 
   group('NewRentalCubit', () {
     test('opens with the first available toy and its default duration/price', () {
-      final cubit = NewRentalCubit(ToyRepository(), RentalRepository(), notifications: FakeRentalNotifier());
+      final cubit = NewRentalCubit(fakeToyRepository(), RentalRepository(), notifications: FakeRentalNotifier());
 
       // Seed: 'carrinho' (qty 2, 1 active) is first in kInitialToys and
       // still has 1 free unit, so it's the default pick.
@@ -104,7 +104,7 @@ void main() {
     });
 
     test('setToy() resets duration/price to the new toy and clears the custom rate', () {
-      final cubit = NewRentalCubit(ToyRepository(), RentalRepository(), notifications: FakeRentalNotifier());
+      final cubit = NewRentalCubit(fakeToyRepository(), RentalRepository(), notifications: FakeRentalNotifier());
       cubit.setCustomRate(2.5);
 
       cubit.setToy('cama'); // qty 1, blockMin 30, price 15
@@ -118,7 +118,7 @@ void main() {
     });
 
     test('applyDuration() scales price proportionally, same formula as before', () {
-      final cubit = NewRentalCubit(ToyRepository(), RentalRepository(), notifications: FakeRentalNotifier());
+      final cubit = NewRentalCubit(fakeToyRepository(), RentalRepository(), notifications: FakeRentalNotifier());
       cubit.setToy('cama'); // blockMin 30, price 15 -> R$0,50/min
 
       cubit.applyDuration(10);
@@ -132,7 +132,7 @@ void main() {
     test('submit() writes through RentalRepository and schedules its notifications', () {
       final rentalRepository = RentalRepository();
       final notifier = FakeRentalNotifier();
-      final cubit = NewRentalCubit(ToyRepository(), rentalRepository, notifications: notifier);
+      final cubit = NewRentalCubit(fakeToyRepository(), rentalRepository, notifications: notifier);
       cubit.setChildName('Teste Nova Locação');
 
       final rental = cubit.submit();
@@ -145,7 +145,7 @@ void main() {
     });
 
     test('shares the created rental with AppState.rentals when Repositories are injected', () {
-      final toyRepository = ToyRepository();
+      final toyRepository = fakeToyRepository();
       final rentalRepository = RentalRepository();
       final cubit = NewRentalCubit(toyRepository, rentalRepository, notifications: FakeRentalNotifier());
       final state = AppState(

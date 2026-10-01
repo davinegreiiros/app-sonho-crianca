@@ -10,7 +10,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:sonho_de_crianca/main.dart';
 import 'package:sonho_de_crianca/data/repositories/rental_repository.dart';
-import 'package:sonho_de_crianca/data/repositories/toy_repository.dart';
 import 'package:sonho_de_crianca/domain/models/toy.dart';
 import 'package:sonho_de_crianca/state/app_state.dart';
 import 'package:sonho_de_crianca/test_keys.dart';
@@ -18,6 +17,9 @@ import 'package:sonho_de_crianca/theme/app_colors.dart';
 import 'package:sonho_de_crianca/ui/features/app_shell/view_models/app_shell_cubit.dart';
 import 'package:sonho_de_crianca/ui/features/catalog/view_models/toy_catalog_cubit.dart';
 import 'package:sonho_de_crianca/ui/features/catalog/views/add_toy_sheet_view.dart';
+
+import 'fakes/fake_business_settings.dart';
+import 'fakes/fake_toy_backend.dart';
 
 /// Ticket widgets are private (`_TicketStub`) to `catalog_view.dart`, so
 /// they're matched by runtime type name and their `free` field is read
@@ -29,7 +31,15 @@ Finder _ticketsIn(Finder card) =>
 bool _isFree(Widget ticket) => (ticket as dynamic).free as bool;
 
 Future<AppState> _pumpApp(WidgetTester tester, {RentalRepository? rentalRepository}) async {
-  await tester.pumpWidget(SonhoDeCriancaApp(rentalRepository: rentalRepository, startInPostoAdminMode: true));
+  final authRepository = fakeLoggedInAuthRepository();
+  await tester.pumpWidget(SonhoDeCriancaApp(
+    rentalRepository: rentalRepository,
+    authRepository: authRepository,
+    // Catálogo (spec 025): `CatalogView` busca no backend ao abrir a aba —
+    // sem isto, cairia no `ToyRepository` real (produção).
+    toyRepository: fakeToyRepository(initial: kInitialToys, authRepository: authRepository),
+    startInPostoAdminMode: true,
+  ));
   await tester.pump(const Duration(milliseconds: 400));
   final state = Provider.of<AppState>(tester.element(find.byType(MaterialApp)), listen: false);
   // Navigation lives in AppShellCubit (spec 021-migracao-shell-app), not
@@ -89,7 +99,11 @@ void main() {
   testWidgets('qty above the visible cap folds the rest into "+N"', (tester) async {
     final state = await _pumpApp(tester);
 
-    state.addToy(
+    // AppState.addToy foi removido na spec 025 (dead code — catalog_view.dart
+    // já escreve via ToyCatalogCubit desde as specs 012/015); chama o Cubit
+    // direto, mesma instância de ToyRepository que `state`/a tela leem.
+    final cubit = BlocProvider.of<ToyCatalogCubit>(tester.element(find.byType(MaterialApp)), listen: false);
+    await cubit.addToy(
       name: 'Brinquedo Grandão',
       price: 10,
       blockMin: 15,
@@ -122,7 +136,7 @@ void main() {
     // AppState — no ChangeNotifierProvider<AppState> needed here anymore.
     await tester.pumpWidget(
       BlocProvider(
-        create: (_) => ToyCatalogCubit(ToyRepository(), RentalRepository()),
+        create: (_) => ToyCatalogCubit(fakeToyRepository(), RentalRepository()),
         child: const MaterialApp(home: Scaffold(body: AddToySheetView())),
       ),
     );
@@ -145,7 +159,7 @@ void main() {
   testWidgets('AddToySheet suggests the icon\'s label as the toy name, except for "Outro"', (tester) async {
     await tester.pumpWidget(
       BlocProvider(
-        create: (_) => ToyCatalogCubit(ToyRepository(), RentalRepository()),
+        create: (_) => ToyCatalogCubit(fakeToyRepository(), RentalRepository()),
         child: const MaterialApp(home: Scaffold(body: AddToySheetView())),
       ),
     );
