@@ -165,10 +165,14 @@ class CloseShiftView extends StatelessWidget {
                   flex: 2,
                   child: ElevatedButton(
                     key: TestKeys.confirmCloseShiftButton,
-                    onPressed: () {
-                      cubit.confirmCloseTurno();
-                      Navigator.of(context).pop();
-                    },
+                    // Sem contagem válida não fecha (0 digitado vale) —
+                    // ver `PostoSessionCubit.confirmCloseTurno`.
+                    onPressed: state.closingCountedCash == null
+                        ? null
+                        : () {
+                            cubit.confirmCloseTurno();
+                            Navigator.of(context).pop();
+                          },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.accent,
                       foregroundColor: AppColors.bg,

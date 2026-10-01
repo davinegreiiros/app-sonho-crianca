@@ -19,6 +19,8 @@ import 'package:sonho_de_crianca/domain/models/rental.dart';
 import 'package:sonho_de_crianca/domain/models/turno.dart';
 import 'package:sonho_de_crianca/main.dart';
 import 'package:sonho_de_crianca/test_keys.dart';
+import 'package:sonho_de_crianca/ui/features/admin_panel/view_models/admin_panel_cubit.dart';
+import 'package:sonho_de_crianca/ui/features/admin_panel/view_models/admin_panel_state.dart';
 import 'package:sonho_de_crianca/ui/features/posto/view_models/posto_session_cubit.dart';
 import 'package:sonho_de_crianca/ui/features/posto/view_models/posto_session_state.dart';
 
@@ -179,6 +181,136 @@ void main() {
     expect(find.textContaining('1 locações'), findsOneWidget);
     expect(find.text('Gustavo'), findsWidgets); // linha do turno + autor na trilha
     expect(find.textContaining('Encerrou'), findsOneWidget);
+    expect(find.textContaining('Iniciou'), findsOneWidget);
+  });
+
+  group('fechamento de turno (Codex review)', () {
+    Rental done(String id, {required DateTime endedAt, required double price, String? by}) => Rental(
+          id: id,
+          toyId: 'cama',
+          childName: 'Criança',
+          guardianName: 'Resp',
+          startedAt: endedAt.subtract(const Duration(minutes: 30)),
+          durationMin: 30,
+          price: price,
+          status: RentalStatus.done,
+          endedAt: endedAt,
+          paymentMethod: PaymentMethod.dinheiro,
+          finishedByMonitorName: by,
+        );
+
+    test('esperado do turno ignora locação encerrada pelo administrador ou outro monitor', () {
+      final openedAt = DateTime.now().subtract(const Duration(hours: 1));
+      final turnoRepository = TurnoRepository();
+      turnoRepository.turnos.add(Turno(id: 't1', toyId: 'cama', monitorName: 'Gustavo', openedAt: openedAt));
+      final rentalRepository = RentalRepository();
+      rentalRepository.rentals.addAll([
+        done('r1', endedAt: openedAt.add(const Duration(minutes: 10)), price: 15, by: 'Gustavo'),
+        done('r2', endedAt: openedAt.add(const Duration(minutes: 20)), price: 40), // administrador
+        done('r3', endedAt: openedAt.add(const Duration(minutes: 30)), price: 25, by: 'Ana'),
+      ]);
+      final cubit = PostoSessionCubit(ToyRepository(), rentalRepository, turnoRepository);
+
+      cubit.openOrResume('cama');
+      cubit.beginClosing();
+
+      expect(cubit.state.closingExpectedCash, 15);
+      expect(cubit.state.closingLocCount, 1);
+      cubit.close();
+    });
+
+    test('não fecha o turno com o campo de dinheiro vazio/inválido, mas aceita 0 explícito', () {
+      final turnoRepository = TurnoRepository();
+      turnoRepository.turnos.add(Turno(id: 't1', toyId: 'cama', monitorName: 'Gustavo', openedAt: DateTime.now()));
+      final cubit = PostoSessionCubit(ToyRepository(), RentalRepository(), turnoRepository);
+      cubit.openOrResume('cama');
+      cubit.beginClosing();
+
+      cubit.confirmCloseTurno(); // vazio
+      expect(turnoRepository.turnos.single.isOpen, isTrue);
+
+      cubit.setClosingCountedCash('abc');
+      cubit.confirmCloseTurno();
+      expect(turnoRepository.turnos.single.isOpen, isTrue);
+
+      cubit.setClosingCountedCash('0');
+      cubit.confirmCloseTurno();
+      expect(turnoRepository.turnos.single.isOpen, isFalse);
+      expect(turnoRepository.turnos.single.countedCash, 0);
+      cubit.close();
+    });
+
+    test('linha do turno no painel admin só soma o que o monitor do turno encerrou', () {
+      final now = DateTime.now();
+      final turnoRepository = TurnoRepository();
+      turnoRepository.turnos.add(Turno(id: 't1', toyId: 'cama', monitorName: 'Gustavo', openedAt: now.subtract(const Duration(minutes: 50))));
+      final rentalRepository = RentalRepository();
+      rentalRepository.rentals.addAll([
+        done('r1', endedAt: now.subtract(const Duration(minutes: 20)), price: 15, by: 'Gustavo'),
+        done('r2', endedAt: now.subtract(const Duration(minutes: 10)), price: 40),
+      ]);
+      final cubit = AdminPanelCubit(rentalRepository, ToyRepository(), turnoRepository);
+
+      final row = cubit.state.turnRows.single;
+      expect(row.locCount, 1);
+      expect(row.gross, 15);
+      cubit.close();
+    });
+
+    test('trilha do admin registra criação (inclusive de locação ainda ativa) e encerramento, mais recente primeiro', () {
+      final now = DateTime.now();
+      final rentalRepository = RentalRepository();
+      rentalRepository.rentals.addAll([
+        Rental(
+          id: 'r1',
+          toyId: 'cama',
+          childName: 'Manuela',
+          guardianName: 'Bruno',
+          startedAt: now.subtract(const Duration(minutes: 40)),
+          durationMin: 30,
+          price: 15,
+          status: RentalStatus.done,
+          endedAt: now.subtract(const Duration(minutes: 10)),
+          paymentMethod: PaymentMethod.dinheiro,
+          createdByMonitorName: 'Gustavo',
+          finishedByMonitorName: 'Gustavo',
+        ),
+        Rental(
+          id: 'r2',
+          toyId: 'cama',
+          childName: 'Pedro',
+          guardianName: 'Carla',
+          startedAt: now.subtract(const Duration(minutes: 5)),
+          durationMin: 30,
+          price: 15,
+          status: RentalStatus.active,
+          createdByMonitorName: 'Ana',
+        ),
+        // Criada ontem, encerrada hoje — só o encerramento é de hoje.
+        Rental(
+          id: 'r3',
+          toyId: 'cama',
+          childName: 'Lia',
+          guardianName: 'Rui',
+          startedAt: now.subtract(const Duration(days: 2)),
+          durationMin: 30,
+          price: 20,
+          status: RentalStatus.done,
+          endedAt: now.subtract(const Duration(minutes: 1)),
+          paymentMethod: PaymentMethod.pix,
+        ),
+      ]);
+      final cubit = AdminPanelCubit(rentalRepository, ToyRepository(), TurnoRepository());
+
+      final trail = cubit.state.trail.map((e) => (e.rental.id, e.action, e.actor)).toList();
+      expect(trail, [
+        ('r3', TrailAction.finished, null),
+        ('r2', TrailAction.created, 'Ana'),
+        ('r1', TrailAction.finished, 'Gustavo'),
+        ('r1', TrailAction.created, 'Gustavo'),
+      ]);
+      cubit.close();
+    });
   });
 
   test('PostoSessionCubit.openOrResume nunca abre 2 turnos pro mesmo toyId', () {

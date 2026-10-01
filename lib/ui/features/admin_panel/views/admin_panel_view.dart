@@ -221,6 +221,10 @@ class _TrailRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final r = entry.rental;
     final id = r.id.length <= 4 ? r.id : r.id.substring(r.id.length - 4);
+    final finished = entry.action == TrailAction.finished;
+    // Tempo corrido não tem preço até encerrar (`price` fica 0) — na
+    // criação mostra o rótulo em vez de um R$ 0,00 enganoso.
+    final amount = finished || !r.isOpenEnded ? formatMoney(r.price) : 'tempo corrido';
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 7),
       child: Row(
@@ -228,14 +232,14 @@ class _TrailRow extends StatelessWidget {
           SizedBox(
             width: 44,
             child: Text(
-              '${r.endedAt!.hour.toString().padLeft(2, '0')}:${r.endedAt!.minute.toString().padLeft(2, '0')}',
+              '${entry.at.hour.toString().padLeft(2, '0')}:${entry.at.minute.toString().padLeft(2, '0')}',
               style: TextStyle(fontSize: 11, fontFamily: 'monospace', color: AppColors.text.withValues(alpha: 0.55)),
             ),
           ),
           SizedBox(
             width: 90,
             child: Text(
-              r.finishedByMonitorName ?? 'Administrador',
+              entry.actor ?? 'Administrador',
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
             ),
@@ -243,15 +247,15 @@ class _TrailRow extends StatelessWidget {
           Expanded(
             child: Text.rich(
               TextSpan(children: [
-                const TextSpan(text: 'Encerrou '),
+                TextSpan(text: finished ? 'Encerrou ' : 'Iniciou '),
                 TextSpan(text: r.childName, style: const TextStyle(fontWeight: FontWeight.w600)),
-                TextSpan(text: ' · ${entry.toy.name} · ${r.paymentMethod?.label ?? ''}'),
+                TextSpan(text: finished ? ' · ${entry.toy.name} · ${r.paymentMethod?.label ?? ''}' : ' · ${entry.toy.name}'),
               ]),
               style: const TextStyle(fontSize: 12.5),
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          Text(formatMoney(r.price), style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+          Text(amount, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
           const SizedBox(width: 8),
           Text('#$id', style: TextStyle(fontSize: 9.5, fontFamily: 'monospace', color: AppColors.text.withValues(alpha: 0.35))),
         ],
