@@ -1,17 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../data/repositories/auth_repository.dart';
 import '../data/repositories/toy_repository.dart';
 import '../theme/app_colors.dart';
 import '../ui/features/admin_panel/views/admin_panel_view.dart';
-import '../ui/features/auth/views/login_view.dart';
 import '../ui/features/business_settings/views/business_settings_view.dart';
 import '../ui/features/catalog/views/add_toy_sheet_view.dart';
 import '../ui/features/rental/view_models/active_rentals_cubit.dart';
 import '../ui/features/rental/view_models/new_rental_cubit.dart';
 import '../ui/features/rental/views/end_rental_dialog_view.dart';
 import '../ui/features/rental/views/new_rental_sheet_view.dart';
+import 'auth_gate.dart';
 
 /// Opens the "Nova locação" form as a real modal bottom sheet — slides up
 /// from the bottom with the framework's own transition, dims the
@@ -81,8 +80,16 @@ Future<void> showEndRentalDialog(BuildContext context, String rentalId) async {
 }
 
 /// Opens the "Adicionar brinquedo" form as a modal bottom sheet.
-Future<void> showAddToySheet(BuildContext context) {
-  return showModalBottomSheet<void>(
+///
+/// Guarda de login (spec 025-catalogo-sessao-dispositivo): criar brinquedo
+/// grava autoria de operador real (não a sessão de dispositivo, que só
+/// lê) — mesma guarda de [openBusinessSettingsScreen], reaproveitada via
+/// `ensureOperatorSession`.
+Future<void> showAddToySheet(BuildContext context) async {
+  if (!await ensureOperatorSession(context)) return;
+  if (!context.mounted) return;
+
+  await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
@@ -103,13 +110,7 @@ Future<void> showAddToySheet(BuildContext context) {
 /// sem logar), nunca chega a abrir Configurações. Sessão expirar *durante*
 /// o uso da tela (cenário 5) volta pra cá com um aviso.
 Future<void> openBusinessSettingsScreen(BuildContext context, {String? hint}) async {
-  final authRepository = context.read<AuthRepository>();
-  if (!authRepository.isLoggedIn) {
-    final loggedIn = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (context) => const LoginView()),
-    );
-    if (loggedIn != true) return;
-  }
+  if (!await ensureOperatorSession(context)) return;
   if (!context.mounted) return;
 
   final exitReason = await Navigator.of(context).push<BusinessSettingsExitReason>(

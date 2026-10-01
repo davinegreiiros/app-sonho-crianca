@@ -6,19 +6,19 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:sonho_de_crianca/data/repositories/rental_repository.dart';
-import 'package:sonho_de_crianca/data/repositories/toy_repository.dart';
 import 'package:sonho_de_crianca/domain/models/rental.dart';
 import 'package:sonho_de_crianca/state/app_state.dart';
 import 'package:sonho_de_crianca/ui/features/home/view_models/home_cubit.dart';
 
 import 'fakes/fake_rental_notifier.dart';
+import 'fakes/fake_toy_backend.dart';
 
 void main() {
   SharedPreferences.setMockInitialValues({});
 
   group('HomeCubit', () {
     test('seed: 3 active, h1-h3 finished today (35 total), h4-h8 finished earlier', () {
-      final cubit = HomeCubit(ToyRepository(), RentalRepository.withDemoSeed());
+      final cubit = HomeCubit(fakeToyRepository(), RentalRepository.withDemoSeed());
 
       expect(cubit.state.activeCount, 3);
       expect(cubit.state.doneTodayCount, 3);
@@ -28,7 +28,7 @@ void main() {
     });
 
     test('recentActivity mixes active + done-today, most recent first, capped at 4', () {
-      final cubit = HomeCubit(ToyRepository(), RentalRepository.withDemoSeed());
+      final cubit = HomeCubit(fakeToyRepository(), RentalRepository.withDemoSeed());
 
       expect(cubit.state.recentActivity, hasLength(4));
       for (var i = 1; i < cubit.state.recentActivity.length; i++) {
@@ -43,7 +43,7 @@ void main() {
     });
 
     test('availableCount sums ComputeToyAvailability across the whole catalog', () {
-      final cubit = HomeCubit(ToyRepository(), RentalRepository.withDemoSeed());
+      final cubit = HomeCubit(fakeToyRepository(), RentalRepository.withDemoSeed());
 
       // carrinho(2,-1)+cama(1)+pula(2,-1)+piscina(1)+patinete(2,-1) = 1+1+1+1+1 = 5
       expect(cubit.state.availableCount, 5);
@@ -52,7 +52,7 @@ void main() {
     });
 
     test('reacts to a new rental in a shared RentalRepository', () {
-      final toyRepository = ToyRepository();
+      final toyRepository = fakeToyRepository();
       final rentalRepository = RentalRepository();
       final cubit = HomeCubit(toyRepository, rentalRepository);
       final before = cubit.state.activeCount;
@@ -74,7 +74,7 @@ void main() {
     });
 
     test('shares state with AppState when the same Repositories are injected', () {
-      final toyRepository = ToyRepository();
+      final toyRepository = fakeToyRepository();
       final rentalRepository = RentalRepository();
       final cubit = HomeCubit(toyRepository, rentalRepository);
       final state = AppState(

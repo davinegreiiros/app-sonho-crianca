@@ -8,13 +8,13 @@ import '../data/repositories/toy_repository.dart';
 import '../data/services/api_client.dart';
 import '../data/services/business_settings_remote_service.dart';
 import '../data/services/local_rental_notifier.dart';
+import '../data/services/toy_remote_service.dart';
 import '../domain/formatters.dart';
 import '../domain/models/business_settings.dart';
 import '../domain/models/rental.dart';
 import '../domain/models/toy.dart';
 import '../domain/rental_notifier.dart';
 import '../domain/use_cases/schedule_rental_end_notifications.dart';
-import '../theme/app_colors.dart';
 import '../ui/features/app_shell/view_models/app_shell_state.dart';
 
 export '../ui/features/app_shell/view_models/app_shell_state.dart' show AppTab;
@@ -67,7 +67,11 @@ class AppState extends ChangeNotifier {
               authRepository: AuthRepository(),
             ),
         _ownsBusinessSettingsRepository = businessSettingsRepository == null,
-        _toyRepository = toyRepository ?? ToyRepository(),
+        _toyRepository = toyRepository ??
+            ToyRepository(
+              service: ToyRemoteService(ApiClient()),
+              authRepository: AuthRepository(),
+            ),
         _ownsToyRepository = toyRepository == null,
         _rentalRepository = rentalRepository ?? RentalRepository(),
         _ownsRentalRepository = rentalRepository == null {
@@ -427,42 +431,11 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void updateToyPrice(String id, double v) => _toyRepository.updatePrice(id, v);
-
-  void updateToyBlock(String id, int v) => _toyRepository.updateBlockMinutes(id, v);
-
-  void addToy({
-    required String name,
-    required double price,
-    required int blockMin,
-    required ToyInk ink,
-    required String imageKey,
-    required ToyCategory category,
-    int qty = 1,
-  }) {
-    _toyRepository.addNew(
-      name: name,
-      price: price,
-      blockMin: blockMin,
-      ink: ink,
-      imageKey: imageKey,
-      category: category,
-      qty: qty,
-    );
-  }
-
-  bool toyHasRentals(String id) => rentals.any((r) => r.toyId == id);
-
-  /// Removes a toy from the catalog. Refuses (returns false) if any
-  /// rental — active or in history — still references it, since
-  /// [toyById]'s fallback would otherwise silently mislabel that entry.
-  /// The guard stays here (not in `ToyRepository`) because it needs
-  /// [rentals], a different domain that repository doesn't know about.
-  bool removeToy(String id) {
-    if (toyHasRentals(id)) return false;
-    _toyRepository.remove(id);
-    return true;
-  }
+  // ToyRepository mutations (addToy/updateToyPrice/updateToyBlock/
+  // removeToy/toyHasRentals) removidas na spec 025-catalogo-sessao-
+  // dispositivo: sem chamador desde que catalog_view.dart/
+  // add_toy_sheet_view.dart migraram pra ToyCatalogCubit (specs 012/015).
+  // Virar `Future` só pra ninguém `await`-ar seria manter morto, não migrar.
 
   // ------------------------------ derived data ------------------------------
 

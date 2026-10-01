@@ -36,6 +36,8 @@ class _AddToySheetViewState extends State<AddToySheetView> {
   /// troca de ícone seguinte.
   String? _autoFilledName;
 
+  bool _submitting = false;
+
   void _selectIcon(String key) {
     setState(() {
       _imageKey = key;
@@ -71,18 +73,32 @@ class _AddToySheetViewState extends State<AddToySheetView> {
       (double.tryParse(_priceCtrl.text) ?? -1) >= 0 &&
       _category != null;
 
-  void _submit(ToyCatalogCubit cubit) {
-    if (!_valid) return;
-    cubit.addToy(
-      name: _nameCtrl.text.trim(),
-      price: double.parse(_priceCtrl.text),
-      blockMin: int.parse(_minutesCtrl.text),
-      ink: _ink,
-      imageKey: _imageKey,
-      category: _category!,
-      qty: int.parse(_qtyCtrl.text),
-    );
-    Navigator.of(context).pop();
+  /// Só fecha a sheet em sucesso confirmado (spec 025, mesmo padrão de
+  /// `BusinessSettingsView._save`) — erro (sem sessão de operador real,
+  /// sem rede, backend recusou) mostra `SnackBar` e deixa o formulário
+  /// aberto, preenchido, pra tentar de novo.
+  Future<void> _submit(ToyCatalogCubit cubit) async {
+    if (!_valid || _submitting) return;
+    setState(() => _submitting = true);
+    try {
+      await cubit.addToy(
+        name: _nameCtrl.text.trim(),
+        price: double.parse(_priceCtrl.text),
+        blockMin: int.parse(_minutesCtrl.text),
+        ink: _ink,
+        imageKey: _imageKey,
+        category: _category!,
+        qty: int.parse(_qtyCtrl.text),
+      );
+      if (mounted) Navigator.of(context).pop();
+    } catch (e) {
+      if (!mounted) return;
+      final messenger = ScaffoldMessenger.of(context);
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(SnackBar(content: Text(e.toString()), duration: const Duration(seconds: 3)));
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
   }
 
   @override
@@ -229,7 +245,7 @@ class _AddToySheetViewState extends State<AddToySheetView> {
                     child: Pressable(
                       child: ElevatedButton(
                         key: TestKeys.addToySubmitButton,
-                        onPressed: _valid ? () => _submit(cubit) : null,
+                        onPressed: _valid && !_submitting ? () => _submit(cubit) : null,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.accent,
                           foregroundColor: AppColors.bg,
@@ -249,7 +265,13 @@ class _AddToySheetViewState extends State<AddToySheetView> {
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                        child: const Text('Salvar brinquedo'),
+                        child: _submitting
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.bg),
+                              )
+                            : const Text('Salvar brinquedo'),
                       ),
                     ),
                   ),

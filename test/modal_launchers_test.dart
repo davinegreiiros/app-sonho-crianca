@@ -12,9 +12,13 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:sonho_de_crianca/data/repositories/toy_repository.dart';
+import 'package:sonho_de_crianca/domain/models/toy.dart';
 import 'package:sonho_de_crianca/main.dart';
 import 'package:sonho_de_crianca/test_keys.dart';
 import 'package:sonho_de_crianca/ui/features/rental/views/new_rental_sheet_view.dart';
+
+import 'fakes/fake_business_settings.dart';
+import 'fakes/fake_toy_backend.dart';
 
 const _settle = Duration(milliseconds: 400);
 
@@ -22,7 +26,14 @@ void main() {
   SharedPreferences.setMockInitialValues({});
 
   testWidgets('tapping "+" with an empty catalog shows a message instead of crashing', (tester) async {
-    await tester.pumpWidget(const SonhoDeCriancaApp(startInPostoAdminMode: true));
+    final authRepository = fakeLoggedInAuthRepository();
+    await tester.pumpWidget(SonhoDeCriancaApp(
+      authRepository: authRepository,
+      // Catálogo (spec 025): sem isto cairia no ToyRepository real
+      // (produção) assim que a remoção abaixo disparasse.
+      toyRepository: fakeToyRepository(initial: kInitialToys, authRepository: authRepository),
+      startInPostoAdminMode: true,
+    ));
     await tester.pump(_settle);
 
     // Empties the catalog mid-session (booting with an already-empty
@@ -30,7 +41,7 @@ void main() {
     // out of scope here) through the same shared instance the app reads.
     final toyRepository = Provider.of<ToyRepository>(tester.element(find.byType(MaterialApp)), listen: false);
     for (final toy in List.of(toyRepository.toys)) {
-      toyRepository.remove(toy.id);
+      await toyRepository.remove(toy.id);
     }
     await tester.pump(_settle);
     expect(toyRepository.toys, isEmpty);
