@@ -110,8 +110,13 @@ class RentalRepository extends ChangeNotifier {
   /// Cria a locação no backend (sessão de operador real — já garantida ao
   /// abrir o posto, ou pela guarda de login em modo administrador). Sem
   /// sessão, lança antes de tocar em [rentals]. `createdByMonitorName` é
-  /// preenchido aqui, localmente, com quem está agindo agora — o backend
-  /// não devolve nome de operador (só `createdByOperatorId`).
+  /// preenchido aqui, localmente, com [createdByMonitorName] — nome
+  /// digitado em "Quem é você hoje" (spec 023, `null` em modo
+  /// administrador), **não** o nome de quem está logado: a sessão de
+  /// operador real só serve pra autenticar a escrita no backend (spec
+  /// 026 — "login fica só com o administrador"), nunca representa quem
+  /// de fato está operando o posto. O backend não devolve nome nenhum
+  /// (só `createdByOperatorId`), então isso nunca viria de lá mesmo.
   Future<Rental> addNew({
     required String toyId,
     required String childName,
@@ -120,6 +125,7 @@ class RentalRepository extends ChangeNotifier {
     required int? durationMin,
     required double price,
     required double? ratePerMinute,
+    String? createdByMonitorName,
   }) async {
     final token = _requireOperatorToken();
     final rental = await _service.create(
@@ -133,7 +139,7 @@ class RentalRepository extends ChangeNotifier {
       price: price,
       token: token,
     );
-    rental.createdByMonitorName = _authRepository.currentOperator?.name;
+    rental.createdByMonitorName = createdByMonitorName;
     if (!_disposed) {
       rentals.add(rental);
       notifyListeners();
@@ -196,8 +202,9 @@ class RentalRepository extends ChangeNotifier {
 
   /// Marca a locação finalizada (paga) — [finalPrice] só pra uma locação
   /// de tempo corrido (preço fixo nunca muda ao finalizar, mesmo contrato
-  /// de sempre).
-  Future<void> finish(String rentalId, PaymentMethod method, {double? finalPrice}) async {
+  /// de sempre). [finishedByMonitorName]: mesmo rótulo local de
+  /// [addNew], não quem está logado (ver doc ali).
+  Future<void> finish(String rentalId, PaymentMethod method, {double? finalPrice, String? finishedByMonitorName}) async {
     final token = _requireOperatorToken();
     final index = rentals.indexWhere((r) => r.id == rentalId);
     if (index == -1) return;
@@ -208,7 +215,7 @@ class RentalRepository extends ChangeNotifier {
     final previousPrice = r.price;
     final previousFinishedBy = r.finishedByMonitorName;
     if (finalPrice != null) r.price = finalPrice;
-    r.finish(method, finishedByMonitorName: _authRepository.currentOperator?.name);
+    r.finish(method, finishedByMonitorName: finishedByMonitorName);
     notifyListeners();
     try {
       await _service.finish(rentalId, method, token: token);

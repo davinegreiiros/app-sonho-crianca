@@ -1,6 +1,8 @@
-# Tasks: Rental via backend — login real por turno
+# Tasks: Rental via backend — login fica só com o administrador
 
 Referência: `spec.md` + `plan.md` nesta mesma pasta. Ordem importa — de cima pra baixo.
+
+> **T6/T9/T2 corrigidos** antes do merge (ver `spec.md`, "Correção"): a versão original trocava "Quem é você hoje" por login por turno; revertido pro nome livre de sempre, com a guarda de login movida pra primeira escrita de dinheiro (qualquer ação, posto ou admin) em vez de "abrir o posto". `createdByMonitorName`/`finishedByMonitorName` voltaram a vir do rótulo local digitado, não de `authRepository.currentOperator`.
 
 - [x] T1 — `lib/data/services/rental_remote_service.dart` — `load({token})` (loop de cursor até `nextCursor == null`), `create`/`extend`/`cancel`/`finish` ({token} operador real) via `ApiClient`. Mapeamento JSON↔`Rental` ignora `createdByOperatorId`/`finishedByOperatorId` do backend (sem campo local equivalente por id).
 - [x] T2 — `lib/data/repositories/rental_repository.dart` reescrito: construtor `{required RentalRemoteService service, required AuthRepository authRepository}`; `load()` via `deviceToken`, fallback silencioso (cenário 5); `addNew`/`extend`/`cancel`/`finish` `Future`, otimistas com reversão em falha; sem sessão real lança `ApiUnauthorizedException` antes de tocar em `rentals`; `createdByMonitorName`/`finishedByMonitorName` preenchidos de `authRepository.currentOperator?.name` localmente. **Atenção** (coberta por teste dedicado em `rental_repository_test.dart`): `extend` recebe `durationMin` absoluto (contrato atual) mas chama `_service.extend(id, addMinutes: durationMin - atual.durationMin)` — a rota do backend espera incremento, não total (ver `plan.md`).

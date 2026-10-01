@@ -7,7 +7,6 @@ import '../ui/features/admin_panel/views/admin_panel_view.dart';
 import '../ui/features/business_settings/views/business_settings_view.dart';
 import '../ui/features/catalog/views/add_toy_sheet_view.dart';
 import '../ui/features/posto/view_models/posto_session_cubit.dart';
-import '../ui/features/posto/view_models/posto_session_state.dart';
 import '../ui/features/rental/view_models/active_rentals_cubit.dart';
 import '../ui/features/rental/view_models/new_rental_cubit.dart';
 import '../ui/features/rental/views/end_rental_dialog_view.dart';
@@ -82,19 +81,22 @@ Future<void> showEndRentalDialog(BuildContext context, String rentalId) async {
   cubit.closeEnd();
 }
 
-/// Confirma o fim da locação (spec 026-rental-via-backend) — chamado por
-/// `EndRentalDialogView` (pagamento não-Pix) e `PixQrSheetView` (depois
-/// do QR). No fluxo do posto (`PostoMode.monitor`), a sessão real já
-/// existe desde que o turno abriu — `ensureOperatorSession` só confirma;
-/// em modo administrador pode ser a primeira ação sensível da sessão.
-/// Falha mantém o diálogo aberto (não finge sucesso, não perde a forma de
+/// Confirma o fim da locação (spec 026-rental-via-backend — "login fica
+/// só com o administrador") — chamado por `EndRentalDialogView`
+/// (pagamento não-Pix) e `PixQrSheetView` (depois do QR). Sempre checa
+/// sessão real; como ela persiste no aparelho, só o administrador
+/// costuma vê-la de fato (uma vez, ao configurar o aparelho) — nenhum
+/// monitor rotativo precisa logar depois disso. `actingMonitorName`
+/// (rótulo local de quem está no posto, `null` em modo administrador)
+/// é só pra `finishedByMonitorName`, nunca pra autenticar nada. Falha
+/// mantém o diálogo aberto (não finge sucesso, não perde a forma de
 /// pagamento já escolhida).
 Future<void> confirmEndRental(BuildContext context, ActiveRentalsCubit cubit) async {
-  final inPosto = context.read<PostoSessionCubit>().state.mode == PostoMode.monitor;
-  if (!inPosto && !await ensureOperatorSession(context)) return;
+  if (!await ensureOperatorSession(context)) return;
   if (!context.mounted) return;
+  final actingMonitorName = context.read<PostoSessionCubit>().state.monitorName;
   try {
-    await cubit.confirmEnd();
+    await cubit.confirmEnd(actingMonitorName: actingMonitorName);
     if (context.mounted) Navigator.of(context).pop();
   } catch (e) {
     if (context.mounted) showRentalActionError(context, e);

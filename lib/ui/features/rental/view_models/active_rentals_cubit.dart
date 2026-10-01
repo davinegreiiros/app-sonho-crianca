@@ -121,12 +121,15 @@ class ActiveRentalsCubit extends Cubit<ActiveRentalsState> {
   /// closing the dialog.
   void hidePixQrStep() => emit(state.copyWith(endShowPixQr: false, endFrozenPrice: null));
 
-  /// Finaliza a locação com sessão de operador real (spec 026 — já
-  /// garantida ao abrir o posto, ou pela guarda de login em modo
-  /// administrador). Deixa a exceção subir pra View decidir a UI; só
-  /// limpa o estado do diálogo em sucesso — falha mantém o diálogo aberto
-  /// (operador não perde o pagamento já selecionado).
-  Future<void> confirmEnd() async {
+  /// Finaliza a locação com sessão de operador real (spec 026 —
+  /// tipicamente só o administrador precisa logar, uma vez por
+  /// aparelho). Deixa a exceção subir pra View decidir a UI; só limpa o
+  /// estado do diálogo em sucesso — falha mantém o diálogo aberto
+  /// (operador não perde o pagamento já selecionado). [actingMonitorName]:
+  /// quem está no posto quando o encerramento vem de [MonitorPostoView]
+  /// (spec 023-posto-monitor-painel) — `null` em modo administrador
+  /// (call site lê `PostoSessionCubit`, não este Cubit).
+  Future<void> confirmEnd({String? actingMonitorName}) async {
     final payment = state.endPayment;
     final id = state.endingId;
     if (payment == null || id == null) return;
@@ -135,7 +138,7 @@ class ActiveRentalsCubit extends Cubit<ActiveRentalsState> {
     // one — never recompute a tempo-corrido price after the QR was
     // already shown.
     final finalPrice = r.isOpenEnded ? (state.endFrozenPrice ?? computeFinalPrice(r)) : null;
-    await _rentalRepository.finish(r.id, payment, finalPrice: finalPrice);
+    await _rentalRepository.finish(r.id, payment, finalPrice: finalPrice, finishedByMonitorName: actingMonitorName);
     _cancelNotifications(r.id);
     emit(state.copyWith(endingId: null, endPayment: null, endFrozenPrice: null));
   }

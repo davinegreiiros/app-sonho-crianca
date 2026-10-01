@@ -49,6 +49,8 @@ class TestKeys {
 
   // Posto do monitor / painel administrativo (spec 023-posto-monitor-painel)
   static ValueKey postoRow(String toyId) => ValueKey('posto_row_$toyId');
+  static const postoNameField = ValueKey('posto_name_field');
+  static const postoEnterButton = ValueKey('posto_enter_button');
   static const enterAdminButton = ValueKey('enter_admin_button');
   static const exitPostoButton = ValueKey('exit_posto_button');
   static const closeShiftButton = ValueKey('close_shift_button');

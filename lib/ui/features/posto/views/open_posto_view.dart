@@ -1,25 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:provider/provider.dart';
 
-import '../../../../data/repositories/auth_repository.dart';
 import '../../../../test_keys.dart';
 import '../../../../theme/app_colors.dart';
-import '../../../../widgets/auth_gate.dart';
 import '../../../../widgets/toy_icon.dart';
 import '../view_models/posto_session_cubit.dart';
 import '../view_models/posto_session_state.dart';
 
 /// 3a — "Escolha seu posto" (spec 023-posto-monitor-painel). Always the
 /// app's first screen (`main.dart`, `PostoMode.none`): lists every toy as
-/// a posto, livre ou ocupado (com quem) — tocar num posto ocupado retoma
-/// o turno direto (cenário 2 do spec, sem pedir login de novo: a sessão
-/// de quem abriu já está ativa no aparelho).
+/// a posto, livre ou ocupado (com quem), campo de nome só aparece depois
+/// de tocar num posto livre — tocar num posto ocupado retoma o turno
+/// direto (cenário 2 do spec, sem pedir nome de novo).
 ///
-/// Login real por turno (spec 026-rental-via-backend): tocar num posto
-/// **livre** não pede mais um nome digitado — leva direto ao login real
-/// de operador (`ensureOperatorSession`); sucesso abre o turno com
-/// `Turno.monitorName` = nome do operador logado.
+/// Nome livre, **sem conta** (spec 026-rental-via-backend: decisão
+/// revisada — ver `spec.md`, "Correção — login fica só com o
+/// administrador"). Monitores rotativos não têm Operator cadastrado;
+/// `Turno.monitorName`/`createdByMonitorName` continuam um rótulo local,
+/// nunca verificado. A sessão de operador real que o backend exige pra
+/// escrita (`Rental`) é obtida em outro ponto — na primeira ação de
+/// dinheiro (`ensureOperatorSession` em `new_rental_sheet_view.dart`/
+/// `modal_launchers.dart`), tipicamente só uma vez, pelo administrador,
+/// pro aparelho inteiro (sessão persiste em `flutter_secure_storage`).
 class OpenPostoView extends StatefulWidget {
   const OpenPostoView({super.key});
 
@@ -28,26 +30,34 @@ class OpenPostoView extends StatefulWidget {
 }
 
 class _OpenPostoViewState extends State<OpenPostoView> {
-  bool _entering = false;
+  String? _selectedFreeToyId;
+  final _nameController = TextEditingController();
 
-  Future<void> _tapPosto(PostoSummary p) async {
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  void _tapPosto(PostoSummary p) {
     if (p.openTurno != null) {
       context.read<PostoSessionCubit>().openOrResume(p.toy.id);
       return;
     }
-    if (_entering) return;
-    setState(() => _entering = true);
-    final loggedIn = await ensureOperatorSession(context);
-    if (!mounted) return;
-    setState(() => _entering = false);
-    if (!loggedIn) return;
-    final operatorName = context.read<AuthRepository>().currentOperator!.name;
-    context.read<PostoSessionCubit>().openOrResume(p.toy.id, monitorName: operatorName);
+    setState(() => _selectedFreeToyId = p.toy.id);
+  }
+
+  void _confirmEnter(String toyId) {
+    if (_nameController.text.trim().isEmpty) return;
+    context.read<PostoSessionCubit>().openOrResume(toyId, monitorName: _nameController.text);
+    _nameController.clear();
+    setState(() => _selectedFreeToyId = null);
   }
 
   @override
   Widget build(BuildContext context) {
     final postos = context.watch<PostoSessionCubit>().state.postos;
+    final selectedToy = _selectedFreeToyId;
 
     return Scaffold(
       backgroundColor: AppColors.bg,
@@ -74,11 +84,44 @@ class _OpenPostoViewState extends State<OpenPostoView> {
               _PostoRow(posto: p, onTap: () => _tapPosto(p)),
               const SizedBox(height: 10),
             ],
-            if (_entering) ...[
-              const SizedBox(height: 10),
-              const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-            ],
-            const SizedBox(height: 8),
+            if (selectedToy != null) ...[
+              const SizedBox(height: 6),
+              Container(
+                padding: const EdgeInsets.all(13),
+                decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(4)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'Seu nome no posto',
+                      style: TextStyle(fontSize: 11.5, color: AppColors.text.withValues(alpha: 0.7)),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      key: TestKeys.postoNameField,
+                      controller: _nameController,
+                      autofocus: true,
+                      decoration: const InputDecoration(hintText: 'Ex: Gustavo'),
+                      onSubmitted: (_) => _confirmEnter(selectedToy),
+                    ),
+                    const SizedBox(height: 10),
+                    ElevatedButton(
+                      key: TestKeys.postoEnterButton,
+                      onPressed: () => _confirmEnter(selectedToy),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.accent,
+                        foregroundColor: AppColors.bg,
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(3)),
+                      ),
+                      child: const Text('Entrar no posto'),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+            ] else
+              const SizedBox(height: 8),
             OutlinedButton.icon(
               key: TestKeys.enterAdminButton,
               onPressed: () => context.read<PostoSessionCubit>().enterAdmin(),

@@ -209,9 +209,13 @@ void main() {
       expect(repository.rentals, isEmpty); // nunca tentou o backend
     });
 
-    test('com sessão real cria e aparece em rentals, com o nome do operador', () async {
+    test('com sessão real cria e aparece em rentals, com o rótulo de quem está no posto', () async {
       final repository = _repository(_authAwareBackend(), operatorLoggedIn: true);
 
+      // `createdByMonitorName` é o nome digitado em "Quem é você hoje"
+      // (spec 023), não o operador logado (spec 026 — "login fica só
+      // com o administrador": a sessão real só autentica a escrita,
+      // nunca representa quem está de fato no posto).
       final rental = await repository.addNew(
         toyId: 'carrinho',
         childName: 'Teste',
@@ -220,10 +224,11 @@ void main() {
         durationMin: 15,
         price: 10,
         ratePerMinute: null,
+        createdByMonitorName: 'Gustavo',
       );
 
       expect(repository.rentals.any((r) => r.id == rental.id), isTrue);
-      expect(rental.createdByMonitorName, 'Maria');
+      expect(rental.createdByMonitorName, 'Gustavo');
     });
   });
 

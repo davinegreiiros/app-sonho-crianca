@@ -1,10 +1,12 @@
-# Plan: Rental via backend — login real por turno
+# Plan: Rental via backend — login fica só com o administrador
 
 Referência: `spec.md` nesta mesma pasta.
 
+> **Correção pós-implementação** (ver `spec.md`, "Correção — por que a primeira versão foi revisada"): este plano foi escrito pra uma 1ª versão que trocava "Quem é você hoje" por login real por turno. Revisado antes do merge — "Quem é você hoje" **continua nome livre**, e a guarda de login (`ensureOperatorSession`) se move pra "primeira escrita de dinheiro" em vez de "abrir o posto". Os itens abaixo que mencionam `OpenPostoView`/`AuthRepository.currentOperator!.name` como origem de `monitorName` estão desatualizados — mantidos aqui só como registro histórico da decisão original.
+
 ## Abordagem técnica
 
-Mesmo strangler-fig da `024`/`025`: troca o `Service` por baixo de `RentalRepository`, interface pública minimamente alterada (escrita vira `Future`, leitura continua síncrona via `rentals`, que continua a mesma lista mutável — vários Cubits dependem disso). A parte nova de produto é mover "Quem é você hoje" de nome livre pra login real — tecnicamente é só trocar a origem de uma `String` (de um `TextEditingController` pra `AuthRepository.currentOperator!.name`), o resto do fluxo de `Turno`/`PostoSessionCubit` não muda de forma.
+Mesmo strangler-fig da `024`/`025`: troca o `Service` por baixo de `RentalRepository`, interface pública minimamente alterada (escrita vira `Future`, leitura continua síncrona via `rentals`, que continua a mesma lista mutável — vários Cubits dependem disso). A sessão de operador real (exigida pelo backend pra toda escrita) fica desacoplada do fluxo do posto: a guarda `ensureOperatorSession` entra em `new_rental_sheet_view.dart`/`active_tab_view.dart`/`modal_launchers.dart` (`confirmEndRental`) **sempre**, não só em modo administrador — como a sessão persiste por aparelho (`flutter_secure_storage`, spec 024), na prática só dispara uma vez, pra quem primeiro loga (o administrador). `Turno`/`PostoSessionCubit`/"Quem é você hoje" não mudam de forma nenhuma.
 
 1. **`RentalRemoteService`** (novo, espelha `ToyRemoteService`):
    - `load({required String token}) → Future<List<Rental>>` — chama `GET /api/rentals?limit=200&cursor=...` em loop até `nextCursor == null`, concatena `items`, devolve a lista completa. `limit=200` (teto do backend) minimiza chamadas; ver "Riscos" pra quando isso parar de bastar.

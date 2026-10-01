@@ -47,10 +47,42 @@ void main() {
   SharedPreferences.setMockInitialValues({});
   setUp(setUpFakeSecureStorage);
 
-  testWidgets('abrir um posto livre pede login real e trava o brinquedo em 3b (spec 026)', (tester) async {
+  testWidgets('abrir um posto livre pede só o nome (sem conta) e trava o brinquedo em 3b', (tester) async {
+    final turnoRepository = TurnoRepository();
+    await tester.pumpWidget(SonhoDeCriancaApp(turnoRepository: turnoRepository));
+    await _settle(tester);
+
+    // Começa em 3a (nenhum posto escolhido ainda).
+    expect(find.byKey(TestKeys.postoRow('cama')), findsOneWidget);
+    expect(find.byKey(TestKeys.exitPostoButton), findsNothing);
+
+    await tester.tap(find.byKey(TestKeys.postoRow('cama')));
+    await tester.pump();
+    await tester.enterText(find.byKey(TestKeys.postoNameField), 'Gustavo');
+    // O nome digitado empurra o botão "Entrar no posto" pra fora da
+    // viewport de teste (800x600) — `ensureVisible` só garante a borda
+    // inicial visível, não o botão inteiro; um arrasto extra garante que
+    // o `tap()` abaixo realmente acerta o widget.
+    await tester.drag(find.byType(ListView), const Offset(0, -150));
+    await tester.pump();
+    await tester.tap(find.byKey(TestKeys.postoEnterButton));
+    await _settle(tester);
+
+    // Agora em 3b, travado na Cama Elástica — sem pedir login, sem conta.
+    expect(find.byKey(TestKeys.exitPostoButton), findsOneWidget);
+    expect(find.text('Cama Elástica'), findsOneWidget);
+    expect(find.text('Gustavo'), findsOneWidget);
+    expect(find.byKey(TestKeys.loginUsernameField), findsNothing);
+    expect(turnoRepository.turnos, hasLength(1));
+    expect(turnoRepository.turnos.single.toyId, 'cama');
+    expect(turnoRepository.turnos.single.monitorName, 'Gustavo');
+    expect(turnoRepository.turnos.single.isOpen, isTrue);
+  });
+
+  testWidgets('criar locação no posto sem sessão real leva ao login — depois disso, não pede mais (spec 026)', (tester) async {
     final turnoRepository = TurnoRepository();
     final authRepository = AuthRepository(
-      apiClient: ApiClient(httpClient: fakeLoginBackend(validUsername: 'gustavo', validPassword: 'segredo123', operatorOnSuccess: _gustavo)),
+      apiClient: ApiClient(httpClient: fakeLoginBackend(validUsername: 'admin', validPassword: 'segredo123', operatorOnSuccess: _gustavo)),
     );
     await tester.pumpWidget(SonhoDeCriancaApp(
       authRepository: authRepository,
@@ -60,28 +92,48 @@ void main() {
     ));
     await _settle(tester);
 
-    // Começa em 3a (nenhum posto escolhido ainda).
-    expect(find.byKey(TestKeys.postoRow('cama')), findsOneWidget);
-    expect(find.byKey(TestKeys.exitPostoButton), findsNothing);
-
     await tester.tap(find.byKey(TestKeys.postoRow('cama')));
+    await tester.pump();
+    await tester.enterText(find.byKey(TestKeys.postoNameField), 'Gustavo');
+    await tester.drag(find.byType(ListView), const Offset(0, -150));
+    await tester.pump();
+    await tester.tap(find.byKey(TestKeys.postoEnterButton));
     await _settle(tester);
 
-    // Não é mais um campo de nome livre — é a tela de login real.
+    // "Colocar criança" sem sessão real nenhuma — leva ao login (do
+    // responsável pelo aparelho, não do "monitor Gustavo" em si).
+    await tester.tap(find.text('Colocar criança'));
+    await _settle(tester);
+    await tester.enterText(find.byKey(TestKeys.draftChildNameField), 'Sofia');
+    // Sem este `pump()`, o botão "Iniciar locação" ainda reflete o
+    // snapshot antigo (desabilitado, sem nome) quando o `tap()` abaixo
+    // acontece — mesmo motivo documentado em `design_v3_test.dart`.
+    await tester.pump();
+    await tester.ensureVisible(find.byKey(TestKeys.submitNewRentalButton));
+    await tester.tap(find.byKey(TestKeys.submitNewRentalButton));
+    await _settle(tester);
+
     expect(find.byKey(TestKeys.loginUsernameField), findsOneWidget);
-    await tester.enterText(find.byKey(TestKeys.loginUsernameField), 'gustavo');
+    await tester.enterText(find.byKey(TestKeys.loginUsernameField), 'admin');
     await tester.enterText(find.byKey(TestKeys.loginPasswordField), 'segredo123');
     await tester.tap(find.byKey(TestKeys.loginSubmitButton));
     await _settle(tester);
 
-    // Agora em 3b, travado na Cama Elástica, com o nome do operador logado.
-    expect(find.byKey(TestKeys.exitPostoButton), findsOneWidget);
-    expect(find.text('Cama Elástica'), findsOneWidget);
-    expect(find.text('Gustavo'), findsOneWidget);
-    expect(turnoRepository.turnos, hasLength(1));
-    expect(turnoRepository.turnos.single.toyId, 'cama');
-    expect(turnoRepository.turnos.single.monitorName, 'Gustavo');
-    expect(turnoRepository.turnos.single.isOpen, isTrue);
+    // Locação criada com o nome do posto (Gustavo), não o do operador logado.
+    expect(find.text('Sofia'), findsOneWidget);
+    expect(authRepository.isLoggedIn, isTrue);
+
+    // Segunda locação no mesmo turno: sessão já persiste, não pede login de novo.
+    await tester.tap(find.text('Colocar criança'));
+    await _settle(tester);
+    await tester.enterText(find.byKey(TestKeys.draftChildNameField), 'Enzo');
+    await tester.pump();
+    await tester.ensureVisible(find.byKey(TestKeys.submitNewRentalButton));
+    await tester.tap(find.byKey(TestKeys.submitNewRentalButton));
+    await _settle(tester);
+
+    expect(find.byKey(TestKeys.loginUsernameField), findsNothing);
+    expect(find.text('Enzo'), findsOneWidget);
   });
 
   testWidgets('tocar um posto já ocupado retoma o mesmo turno, sem pedir login', (tester) async {
@@ -194,6 +246,75 @@ void main() {
     await _settle(tester);
 
     expect(find.text(formatMoney(15)), findsWidgets);
+    expect(find.text('1 locações'), findsOneWidget);
+    expect(find.text('Gustavo'), findsWidgets); // linha do turno + autor na trilha
+    expect(find.textContaining('Encerrou'), findsOneWidget);
+  });
+
+  testWidgets('fluxo completo: posto cria+finaliza locação, fecha turno, tudo aparece no painel administrativo', (tester) async {
+    final authRepository = fakeLoggedInAuthRepository(); // sessão real já presente (igual depois do 1º login do admin)
+    final rentalRepository = fakeRentalRepository(authRepository: authRepository);
+    final turnoRepository = TurnoRepository();
+
+    await tester.pumpWidget(SonhoDeCriancaApp(
+      authRepository: authRepository,
+      toyRepository: fakeToyRepository(authRepository: authRepository),
+      rentalRepository: rentalRepository,
+      turnoRepository: turnoRepository,
+    ));
+    await _settle(tester);
+
+    // 3a -> 3b: abre o posto com nome livre.
+    await tester.tap(find.byKey(TestKeys.postoRow('cama')));
+    await tester.pump();
+    await tester.enterText(find.byKey(TestKeys.postoNameField), 'Gustavo');
+    await tester.drag(find.byType(ListView), const Offset(0, -150));
+    await tester.pump();
+    await tester.tap(find.byKey(TestKeys.postoEnterButton));
+    await _settle(tester);
+
+    // Cria uma locação (sessão já presente — não pede login).
+    await tester.tap(find.text('Colocar criança'));
+    await _settle(tester);
+    await tester.enterText(find.byKey(TestKeys.draftChildNameField), 'Manuela');
+    await tester.pump();
+    await tester.ensureVisible(find.byKey(TestKeys.submitNewRentalButton));
+    await tester.tap(find.byKey(TestKeys.submitNewRentalButton));
+    await _settle(tester);
+
+    final rental = rentalRepository.rentals.firstWhere((r) => r.childName == 'Manuela');
+
+    // Finaliza em Dinheiro.
+    await tester.tap(find.byKey(TestKeys.finishRentalButton(rental.id)));
+    await _settle(tester);
+    await tester.tap(find.byKey(TestKeys.paymentOption('dinheiro')));
+    await tester.pump();
+    await tester.tap(find.byKey(TestKeys.confirmEndButton));
+    await _settle(tester);
+
+    expect(rental.status, RentalStatus.done);
+    expect(rental.paymentMethod, PaymentMethod.dinheiro);
+    expect(rental.finishedByMonitorName, 'Gustavo'); // rótulo do posto, não quem logou
+
+    // Fecha o turno.
+    await tester.tap(find.byKey(TestKeys.closeShiftButton));
+    await _settle(tester);
+    await tester.enterText(find.byKey(TestKeys.closingCashField), rental.price.toStringAsFixed(0));
+    await tester.pump();
+    await tester.ensureVisible(find.byKey(TestKeys.confirmCloseShiftButton));
+    await tester.tap(find.byKey(TestKeys.confirmCloseShiftButton));
+    await _settle(tester);
+
+    expect(find.text('Livre'), findsWidgets); // de volta pra 3a, posto livre de novo
+    expect(turnoRepository.turnos.single.isOpen, isFalse);
+
+    // Entra como administrador e confere que o turno/locação aparecem lá.
+    await tester.tap(find.byKey(TestKeys.enterAdminButton));
+    await _settle(tester);
+    await tester.tap(find.byKey(TestKeys.adminPanelButton));
+    await _settle(tester);
+
+    expect(find.text(formatMoney(rental.price)), findsWidgets);
     expect(find.text('1 locações'), findsOneWidget);
     expect(find.text('Gustavo'), findsWidgets); // linha do turno + autor na trilha
     expect(find.textContaining('Encerrou'), findsOneWidget);
