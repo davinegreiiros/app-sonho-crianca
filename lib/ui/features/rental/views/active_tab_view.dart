@@ -10,9 +10,25 @@ import '../../../../widgets/animations/endless_rail.dart';
 import '../../../../widgets/animations/pressable.dart';
 import '../../../../widgets/animations/pulse.dart';
 import '../../../../widgets/animations/striped_progress.dart';
+import '../../../../widgets/auth_gate.dart';
 import '../../../../widgets/modal_launchers.dart';
+import '../../../../widgets/rental_action_error.dart';
 import '../../../../widgets/toy_icon.dart';
 import '../view_models/active_rentals_cubit.dart';
+
+/// Guarda de login + tratamento de erro compartilhado por "+ tempo" e
+/// "Cancelar" (spec 026-rental-via-backend) — só alcançável em modo
+/// administrador (`HomeShell`, nunca pelo posto: `MonitorPostoView` não
+/// tem estes botões), então a sessão real pode não existir ainda.
+Future<void> _runRentalAction(BuildContext context, Future<void> Function() action) async {
+  if (!await ensureOperatorSession(context)) return;
+  if (!context.mounted) return;
+  try {
+    await action();
+  } catch (e) {
+    if (context.mounted) showRentalActionError(context, e);
+  }
+}
 
 /// Migrated in spec 018-migracao-locacao-ativa-encerrar: reads/writes
 /// through [ActiveRentalsCubit] instead of `AppState`.
@@ -217,7 +233,7 @@ class _ExtendTimeRow extends StatelessWidget {
           Pressable(
             child: OutlinedButton(
               key: TestKeys.extendRentalButton(rentalId, m),
-              onPressed: () => cubit.extendActive(rentalId, m),
+              onPressed: () => _runRentalAction(context, () => cubit.extendActive(rentalId, m)),
               style: OutlinedButton.styleFrom(
                 foregroundColor: fg,
                 side: BorderSide(color: fg.withValues(alpha: 0.25)),
@@ -383,7 +399,7 @@ class _ActiveCard extends StatelessWidget {
                 child: Pressable(
                   child: OutlinedButton(
                     key: TestKeys.cancelRentalButton(rental.id),
-                    onPressed: () => cubit.cancelActive(rental.id),
+                    onPressed: () => _runRentalAction(context, () => cubit.cancelActive(rental.id)),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.text,
                       side: BorderSide(color: AppColors.text.withValues(alpha: 0.14)),

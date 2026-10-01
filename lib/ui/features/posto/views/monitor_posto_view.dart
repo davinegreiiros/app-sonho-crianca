@@ -139,7 +139,7 @@ class MonitorPostoView extends StatelessWidget {
   double _turnoGross(List<Rental> allRentals, String toyId, DateTime? turnoOpenedAt) {
     if (turnoOpenedAt == null) return 0;
     return allRentals
-        .where((r) => r.toyId == toyId && r.status == RentalStatus.done && r.endedAt != null && !r.endedAt!.isBefore(turnoOpenedAt))
+        .where((r) => r.toyId == toyId && r.isCompleted && r.endedAt != null && !r.endedAt!.isBefore(turnoOpenedAt))
         .fold(0.0, (a, r) => a + r.price);
   }
 }

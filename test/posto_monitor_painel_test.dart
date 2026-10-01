@@ -10,10 +10,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
-import 'package:sonho_de_crianca/data/repositories/rental_repository.dart';
+import 'package:sonho_de_crianca/data/repositories/auth_repository.dart';
 import 'package:sonho_de_crianca/data/repositories/turno_repository.dart';
+import 'package:sonho_de_crianca/data/services/api_client.dart';
 import 'package:sonho_de_crianca/data/services/app_database.dart';
 import 'package:sonho_de_crianca/domain/formatters.dart';
+import 'package:sonho_de_crianca/domain/models/operator.dart';
 import 'package:sonho_de_crianca/domain/models/rental.dart';
 import 'package:sonho_de_crianca/domain/models/turno.dart';
 import 'package:sonho_de_crianca/main.dart';
@@ -21,7 +23,13 @@ import 'package:sonho_de_crianca/test_keys.dart';
 import 'package:sonho_de_crianca/ui/features/posto/view_models/posto_session_cubit.dart';
 import 'package:sonho_de_crianca/ui/features/posto/view_models/posto_session_state.dart';
 
+import 'fakes/fake_auth_backend.dart';
+import 'fakes/fake_business_settings.dart' show fakeLoggedInAuthRepository;
+import 'fakes/fake_rental_backend.dart';
+import 'fakes/fake_secure_storage.dart';
 import 'fakes/fake_toy_backend.dart';
+
+const _gustavo = Operator(id: 'op-gustavo', name: 'Gustavo', username: 'gustavo');
 
 /// Multi-frame settle — mesmo padrão já usado em
 /// `full_app_journey_test.dart` (`_settleFrames`): navegação
@@ -37,10 +45,19 @@ Future<void> _settle(WidgetTester tester, {int frames = 8}) async {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   SharedPreferences.setMockInitialValues({});
+  setUp(setUpFakeSecureStorage);
 
-  testWidgets('abrir um posto livre cria um turno e trava o brinquedo em 3b', (tester) async {
+  testWidgets('abrir um posto livre pede login real e trava o brinquedo em 3b (spec 026)', (tester) async {
     final turnoRepository = TurnoRepository();
-    await tester.pumpWidget(SonhoDeCriancaApp(turnoRepository: turnoRepository));
+    final authRepository = AuthRepository(
+      apiClient: ApiClient(httpClient: fakeLoginBackend(validUsername: 'gustavo', validPassword: 'segredo123', operatorOnSuccess: _gustavo)),
+    );
+    await tester.pumpWidget(SonhoDeCriancaApp(
+      authRepository: authRepository,
+      toyRepository: fakeToyRepository(authRepository: authRepository),
+      rentalRepository: fakeRentalRepository(authRepository: authRepository),
+      turnoRepository: turnoRepository,
+    ));
     await _settle(tester);
 
     // Começa em 3a (nenhum posto escolhido ainda).
@@ -48,18 +65,16 @@ void main() {
     expect(find.byKey(TestKeys.exitPostoButton), findsNothing);
 
     await tester.tap(find.byKey(TestKeys.postoRow('cama')));
-    await tester.pump();
-    await tester.enterText(find.byKey(TestKeys.postoNameField), 'Gustavo');
-    // O nome digitado empurra o botão "Entrar no posto" pra fora da
-    // viewport de teste (800x600) — `ensureVisible` só garante a borda
-    // inicial visível, não o botão inteiro; um arrasto extra garante que
-    // o `tap()` abaixo realmente acerta o widget.
-    await tester.drag(find.byType(ListView), const Offset(0, -150));
-    await tester.pump();
-    await tester.tap(find.byKey(TestKeys.postoEnterButton));
     await _settle(tester);
 
-    // Agora em 3b, travado na Cama Elástica.
+    // Não é mais um campo de nome livre — é a tela de login real.
+    expect(find.byKey(TestKeys.loginUsernameField), findsOneWidget);
+    await tester.enterText(find.byKey(TestKeys.loginUsernameField), 'gustavo');
+    await tester.enterText(find.byKey(TestKeys.loginPasswordField), 'segredo123');
+    await tester.tap(find.byKey(TestKeys.loginSubmitButton));
+    await _settle(tester);
+
+    // Agora em 3b, travado na Cama Elástica, com o nome do operador logado.
     expect(find.byKey(TestKeys.exitPostoButton), findsOneWidget);
     expect(find.text('Cama Elástica'), findsOneWidget);
     expect(find.text('Gustavo'), findsOneWidget);
@@ -69,11 +84,17 @@ void main() {
     expect(turnoRepository.turnos.single.isOpen, isTrue);
   });
 
-  testWidgets('tocar um posto já ocupado retoma o mesmo turno, sem duplicar', (tester) async {
+  testWidgets('tocar um posto já ocupado retoma o mesmo turno, sem pedir login', (tester) async {
     final turnoRepository = TurnoRepository();
     final existing = turnoRepository.open('cama', 'Ana');
+    final authRepository = fakeLoggedInAuthRepository();
 
-    await tester.pumpWidget(SonhoDeCriancaApp(turnoRepository: turnoRepository));
+    await tester.pumpWidget(SonhoDeCriancaApp(
+      authRepository: authRepository,
+      toyRepository: fakeToyRepository(authRepository: authRepository),
+      rentalRepository: fakeRentalRepository(authRepository: authRepository),
+      turnoRepository: turnoRepository,
+    ));
     await _settle(tester);
 
     expect(find.text('Com Ana'), findsOneWidget);
@@ -81,8 +102,8 @@ void main() {
     await tester.tap(find.byKey(TestKeys.postoRow('cama')));
     await _settle(tester);
 
-    // Sem o campo de nome — retomou direto.
-    expect(find.byKey(TestKeys.postoNameField), findsNothing);
+    // Sem tela de login — retomou direto.
+    expect(find.byKey(TestKeys.loginUsernameField), findsNothing);
     expect(find.text('Ana'), findsOneWidget);
     expect(turnoRepository.turnos, hasLength(1));
     expect(turnoRepository.turnos.single.id, existing.id);
@@ -92,7 +113,8 @@ void main() {
     final turnoOpenedAt = DateTime.now().subtract(const Duration(hours: 1));
     final turnoRepository = TurnoRepository();
     turnoRepository.turnos.add(Turno(id: 't1', toyId: 'cama', monitorName: 'Gustavo', openedAt: turnoOpenedAt));
-    final rentalRepository = RentalRepository();
+    final authRepository = fakeLoggedInAuthRepository();
+    final rentalRepository = fakeRentalRepository(authRepository: authRepository);
     rentalRepository.rentals.add(Rental(
       id: 'r1',
       toyId: 'cama',
@@ -107,7 +129,12 @@ void main() {
       finishedByMonitorName: 'Gustavo',
     ));
 
-    await tester.pumpWidget(SonhoDeCriancaApp(rentalRepository: rentalRepository, turnoRepository: turnoRepository));
+    await tester.pumpWidget(SonhoDeCriancaApp(
+      authRepository: authRepository,
+      toyRepository: fakeToyRepository(authRepository: authRepository),
+      rentalRepository: rentalRepository,
+      turnoRepository: turnoRepository,
+    ));
     await _settle(tester);
 
     await tester.tap(find.byKey(TestKeys.postoRow('cama')));
@@ -127,7 +154,7 @@ void main() {
     await _settle(tester);
 
     // Volta pra 3a, posto livre de novo.
-    expect(find.byKey(TestKeys.postoNameField), findsNothing);
+    expect(find.byKey(TestKeys.loginUsernameField), findsNothing);
     expect(find.text('Livre'), findsWidgets);
     final turno = turnoRepository.turnos.single;
     expect(turno.isOpen, isFalse);
@@ -136,7 +163,8 @@ void main() {
 
   testWidgets('painel administrativo soma faturamento e lista turnos de hoje', (tester) async {
     final now = DateTime.now();
-    final rentalRepository = RentalRepository();
+    final authRepository = fakeLoggedInAuthRepository();
+    final rentalRepository = fakeRentalRepository(authRepository: authRepository);
     rentalRepository.rentals.add(Rental(
       id: 'r1',
       toyId: 'cama',
@@ -154,6 +182,8 @@ void main() {
     turnoRepository.turnos.add(Turno(id: 't1', toyId: 'cama', monitorName: 'Gustavo', openedAt: now.subtract(const Duration(hours: 1))));
 
     await tester.pumpWidget(SonhoDeCriancaApp(
+      authRepository: authRepository,
+      toyRepository: fakeToyRepository(authRepository: authRepository),
       rentalRepository: rentalRepository,
       turnoRepository: turnoRepository,
       startInPostoAdminMode: true,
@@ -171,7 +201,7 @@ void main() {
 
   test('PostoSessionCubit.openOrResume nunca abre 2 turnos pro mesmo toyId', () {
     final turnoRepository = TurnoRepository();
-    final cubit = PostoSessionCubit(fakeToyRepository(), RentalRepository(), turnoRepository);
+    final cubit = PostoSessionCubit(fakeToyRepository(), fakeRentalRepository(), turnoRepository);
 
     cubit.openOrResume('cama', monitorName: 'Gustavo');
     cubit.exitToSelection();

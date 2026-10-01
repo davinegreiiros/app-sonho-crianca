@@ -10,6 +10,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:sonho_de_crianca/main.dart';
 import 'package:sonho_de_crianca/data/repositories/rental_repository.dart';
+import 'package:sonho_de_crianca/data/services/api_client.dart';
+import 'package:sonho_de_crianca/data/services/rental_remote_service.dart';
 import 'package:sonho_de_crianca/domain/models/toy.dart';
 import 'package:sonho_de_crianca/state/app_state.dart';
 import 'package:sonho_de_crianca/test_keys.dart';
@@ -17,8 +19,10 @@ import 'package:sonho_de_crianca/theme/app_colors.dart';
 import 'package:sonho_de_crianca/ui/features/app_shell/view_models/app_shell_cubit.dart';
 import 'package:sonho_de_crianca/ui/features/catalog/view_models/toy_catalog_cubit.dart';
 import 'package:sonho_de_crianca/ui/features/catalog/views/add_toy_sheet_view.dart';
+import 'package:sonho_de_crianca/ui/features/rental/view_models/new_rental_cubit.dart';
 
 import 'fakes/fake_business_settings.dart';
+import 'fakes/fake_rental_backend.dart';
 import 'fakes/fake_toy_backend.dart';
 
 /// Ticket widgets are private (`_TicketStub`) to `catalog_view.dart`, so
@@ -33,7 +37,13 @@ bool _isFree(Widget ticket) => (ticket as dynamic).free as bool;
 Future<AppState> _pumpApp(WidgetTester tester, {RentalRepository? rentalRepository}) async {
   final authRepository = fakeLoggedInAuthRepository();
   await tester.pumpWidget(SonhoDeCriancaApp(
-    rentalRepository: rentalRepository,
+    // spec 026: sem fake explícito, cairia no RentalRepository real
+    // (produção) assim que qualquer ação de locação disparasse.
+    rentalRepository: rentalRepository ??
+        RentalRepository.withDemoSeed(
+          service: RentalRemoteService(ApiClient(httpClient: fakeRentalBackend())),
+          authRepository: authRepository,
+        ),
     authRepository: authRepository,
     // Catálogo (spec 025): `CatalogView` busca no backend ao abrir a aba —
     // sem isto, cairia no `ToyRepository` real (produção).
@@ -56,7 +66,10 @@ void main() {
   SharedPreferences.setMockInitialValues({});
 
   testWidgets('mixed card shows one free and one in-use ticket', (tester) async {
-    await _pumpApp(tester, rentalRepository: RentalRepository.withDemoSeed());
+    await _pumpApp(tester, rentalRepository: RentalRepository.withDemoSeed(
+      service: RentalRemoteService(ApiClient(httpClient: fakeRentalBackend())),
+      authRepository: fakeLoggedInAuthRepository(),
+    ));
 
     // Seed: 'carrinho' has qty 2, 1 active rental against it (a1).
     final card = find.byKey(TestKeys.toyCardKey('carrinho'));
@@ -69,13 +82,16 @@ void main() {
   });
 
   testWidgets('fully-booked card shows every ticket as in-use', (tester) async {
-    final state = await _pumpApp(tester);
+    await _pumpApp(tester);
 
     // 'cama' has qty 1 and no active rental in the seed — rent its only
     // unit out so every ticket on the card should read as in-use.
-    state.setDraftToy('cama');
-    state.setDraftChild('Teste Ticket');
-    state.submitNew();
+    // AppState.submitNew foi removido na spec 026 (dead code — a UI já
+    // escreve via NewRentalCubit desde a spec 017); chama o Cubit direto.
+    final newRentalCubit = BlocProvider.of<NewRentalCubit>(tester.element(find.byType(MaterialApp)), listen: false);
+    newRentalCubit.setToy('cama');
+    newRentalCubit.setChildName('Teste Ticket');
+    await newRentalCubit.submit();
     await tester.pump(const Duration(milliseconds: 400));
 
     final card = find.byKey(TestKeys.toyCardKey('cama'));
@@ -136,7 +152,7 @@ void main() {
     // AppState — no ChangeNotifierProvider<AppState> needed here anymore.
     await tester.pumpWidget(
       BlocProvider(
-        create: (_) => ToyCatalogCubit(fakeToyRepository(), RentalRepository()),
+        create: (_) => ToyCatalogCubit(fakeToyRepository(), fakeRentalRepository()),
         child: const MaterialApp(home: Scaffold(body: AddToySheetView())),
       ),
     );
@@ -159,7 +175,7 @@ void main() {
   testWidgets('AddToySheet suggests the icon\'s label as the toy name, except for "Outro"', (tester) async {
     await tester.pumpWidget(
       BlocProvider(
-        create: (_) => ToyCatalogCubit(fakeToyRepository(), RentalRepository()),
+        create: (_) => ToyCatalogCubit(fakeToyRepository(), fakeRentalRepository()),
         child: const MaterialApp(home: Scaffold(body: AddToySheetView())),
       ),
     );

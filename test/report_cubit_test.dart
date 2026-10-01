@@ -5,17 +5,17 @@
 
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:sonho_de_crianca/data/repositories/rental_repository.dart';
 import 'package:sonho_de_crianca/domain/models/rental.dart';
 import 'package:sonho_de_crianca/ui/features/report/view_models/report_cubit.dart';
 import 'package:sonho_de_crianca/ui/features/report/view_models/report_state.dart';
 
+import 'fakes/fake_rental_backend.dart';
 import 'fakes/fake_toy_backend.dart';
 
 void main() {
   group('ReportCubit', () {
     test('defaults to "today" and only counts rentals finished today', () {
-      final rentalRepository = RentalRepository.withDemoSeed();
+      final rentalRepository = fakeSeededRentalRepository();
       final cubit = ReportCubit(rentalRepository, fakeToyRepository());
 
       // Seed: h1/h2/h3 finished "today" (todayAt helper), h4-h8 finished
@@ -28,7 +28,7 @@ void main() {
     });
 
     test('setPeriod(all) includes every finished rental, none of the active ones', () {
-      final rentalRepository = RentalRepository.withDemoSeed();
+      final rentalRepository = fakeSeededRentalRepository();
       final cubit = ReportCubit(rentalRepository, fakeToyRepository());
 
       cubit.setPeriod(ReportPeriod.all);
@@ -42,7 +42,7 @@ void main() {
     });
 
     test('paymentBreakdown sums by method, toyBreakdown sums by toy, both over the filtered set', () {
-      final rentalRepository = RentalRepository();
+      final rentalRepository = fakeSeededRentalRepository();
       final cubit = ReportCubit(rentalRepository, fakeToyRepository());
       cubit.setPeriod(ReportPeriod.all);
 
@@ -62,15 +62,17 @@ void main() {
     });
 
     test('reacts when RentalRepository changes elsewhere (shared instance)', () {
-      final rentalRepository = RentalRepository();
+      final rentalRepository = fakeRentalRepository();
       final toyRepository = fakeToyRepository();
       final cubit = ReportCubit(rentalRepository, toyRepository);
       cubit.setPeriod(ReportPeriod.all);
       final before = cubit.state.filteredCount;
 
-      // Simulates AppState.cancelActive / another finished rental — this
-      // repository instance is the one AppState itself would share.
-      rentalRepository.add(Rental(
+      // Simulates another finished rental landing via sync — this
+      // repository instance is the one `ActiveRentalsCubit` itself would
+      // share. `RentalRepository.add` foi removido na spec 026: `rentals`
+      // segue mutável, só precisa notificar manualmente.
+      rentalRepository.rentals.add(Rental(
         id: 'r-report-test',
         toyId: 'carrinho',
         childName: 'Teste Relatório',
@@ -82,6 +84,7 @@ void main() {
         endedAt: DateTime.now(),
         paymentMethod: PaymentMethod.pix,
       ));
+      rentalRepository.notifyListeners();
 
       expect(cubit.state.filteredCount, before + 1);
 

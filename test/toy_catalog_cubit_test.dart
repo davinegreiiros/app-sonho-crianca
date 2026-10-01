@@ -10,7 +10,6 @@ import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:sonho_de_crianca/data/repositories/rental_repository.dart';
 import 'package:sonho_de_crianca/domain/models/rental.dart';
 import 'package:sonho_de_crianca/domain/models/toy.dart';
 import 'package:sonho_de_crianca/domain/use_cases/compute_toy_availability.dart';
@@ -19,6 +18,7 @@ import 'package:sonho_de_crianca/theme/app_colors.dart';
 import 'package:sonho_de_crianca/ui/features/catalog/view_models/toy_catalog_cubit.dart';
 import 'package:sonho_de_crianca/ui/features/catalog/view_models/toy_catalog_state.dart';
 
+import 'fakes/fake_rental_backend.dart';
 import 'fakes/fake_rental_notifier.dart';
 import 'fakes/fake_toy_backend.dart';
 
@@ -92,7 +92,7 @@ void main() {
   group('ToyCatalogCubit', () {
     blocTest<ToyCatalogCubit, ToyCatalogState>(
       'addToy() persists through the Repository and emits the new state',
-      build: () => ToyCatalogCubit(fakeToyRepository(), RentalRepository()),
+      build: () => ToyCatalogCubit(fakeToyRepository(), fakeRentalRepository()),
       act: (cubit) => cubit.addToy(
         name: 'Brinquedo Teste',
         price: 10,
@@ -108,7 +108,7 @@ void main() {
     );
 
     test('availabilityOf() matches the seed (a1/a2/a3 active against carrinho/pula/patinete)', () {
-      final cubit = ToyCatalogCubit(fakeToyRepository(), RentalRepository.withDemoSeed());
+      final cubit = ToyCatalogCubit(fakeToyRepository(), fakeSeededRentalRepository());
 
       final carrinho = cubit.state.toys.firstWhere((t) => t.id == 'carrinho'); // qty 2, 1 active (a1)
       final cama = cubit.state.toys.firstWhere((t) => t.id == 'cama'); // qty 1, 0 active
@@ -121,12 +121,14 @@ void main() {
 
     test('reacts to a new rental in a shared RentalRepository (availability drops)', () {
       final toyRepository = fakeToyRepository();
-      final rentalRepository = RentalRepository();
+      final rentalRepository = fakeRentalRepository();
       final cubit = ToyCatalogCubit(toyRepository, rentalRepository);
       final cama = cubit.state.toys.firstWhere((t) => t.id == 'cama');
       expect(cubit.state.availabilityOf(cama), 1);
 
-      rentalRepository.add(Rental(
+      // `RentalRepository.add` foi removido na spec 026 — `rentals` segue
+      // mutável, só precisa notificar manualmente.
+      rentalRepository.rentals.add(Rental(
         id: 'x-avail-test',
         toyId: 'cama',
         childName: 'Teste',
@@ -136,6 +138,7 @@ void main() {
         price: 15,
         status: RentalStatus.active,
       ));
+      rentalRepository.notifyListeners();
 
       expect(cubit.state.availabilityOf(cama), 0);
 
@@ -144,7 +147,7 @@ void main() {
 
     test('removeToy() refuses a toy with any rental (active or done), succeeds otherwise', () async {
       final toyRepository = fakeToyRepository();
-      final rentalRepository = RentalRepository.withDemoSeed();
+      final rentalRepository = fakeSeededRentalRepository();
       final cubit = ToyCatalogCubit(toyRepository, rentalRepository);
 
       // 'carrinho' has rentals in the seed (a1 active, h1/h6 done).
@@ -167,7 +170,7 @@ void main() {
 
     test('shares state with AppState.toys when the same Repositories are injected', () async {
       final toyRepository = fakeToyRepository();
-      final rentalRepository = RentalRepository();
+      final rentalRepository = fakeRentalRepository();
       final cubit = ToyCatalogCubit(toyRepository, rentalRepository);
       final state = AppState(
         notifications: FakeRentalNotifier(),

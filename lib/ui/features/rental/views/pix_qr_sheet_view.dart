@@ -10,8 +10,8 @@ import '../../../../theme/app_colors.dart';
 import '../../../../widgets/animations/pressable.dart';
 import '../../../../widgets/animations/print_strip.dart';
 import '../../../../widgets/animations/pulse.dart';
+import '../../../../widgets/modal_launchers.dart';
 import '../../business_settings/view_models/business_settings_cubit.dart';
-import '../../posto/view_models/posto_session_cubit.dart';
 import '../view_models/active_rentals_cubit.dart';
 
 /// Shows the Pix QR (+ "copia e cola" text) for a rental's final price,
@@ -234,19 +234,7 @@ class PixQrSheetView extends StatelessWidget {
                       child: Pressable(
                         child: ElevatedButton(
                           key: TestKeys.pixQrDoneButton,
-                          onPressed: () {
-                            // `confirmEnd()` nulls `endingId` and notifies
-                            // synchronously — `EndRentalDialogView` (this
-                            // sheet's parent) rebuilds right then and swaps
-                            // this widget out, so `context` is a deactivated
-                            // element by the time control returns here. Grab
-                            // the `Navigator` first, while `context` is still
-                            // good.
-                            final navigator = Navigator.of(context);
-                            final actingMonitorName = context.read<PostoSessionCubit>().state.monitorName;
-                            cubit.confirmEnd(actingMonitorName: actingMonitorName);
-                            navigator.pop();
-                          },
+                          onPressed: () => confirmEndRental(context, cubit),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.accent,
                             foregroundColor: AppColors.bg,

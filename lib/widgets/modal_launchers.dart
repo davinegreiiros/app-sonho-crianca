@@ -6,11 +6,14 @@ import '../theme/app_colors.dart';
 import '../ui/features/admin_panel/views/admin_panel_view.dart';
 import '../ui/features/business_settings/views/business_settings_view.dart';
 import '../ui/features/catalog/views/add_toy_sheet_view.dart';
+import '../ui/features/posto/view_models/posto_session_cubit.dart';
+import '../ui/features/posto/view_models/posto_session_state.dart';
 import '../ui/features/rental/view_models/active_rentals_cubit.dart';
 import '../ui/features/rental/view_models/new_rental_cubit.dart';
 import '../ui/features/rental/views/end_rental_dialog_view.dart';
 import '../ui/features/rental/views/new_rental_sheet_view.dart';
 import 'auth_gate.dart';
+import 'rental_action_error.dart';
 
 /// Opens the "Nova locação" form as a real modal bottom sheet — slides up
 /// from the bottom with the framework's own transition, dims the
@@ -77,6 +80,25 @@ Future<void> showEndRentalDialog(BuildContext context, String rentalId) async {
     },
   );
   cubit.closeEnd();
+}
+
+/// Confirma o fim da locação (spec 026-rental-via-backend) — chamado por
+/// `EndRentalDialogView` (pagamento não-Pix) e `PixQrSheetView` (depois
+/// do QR). No fluxo do posto (`PostoMode.monitor`), a sessão real já
+/// existe desde que o turno abriu — `ensureOperatorSession` só confirma;
+/// em modo administrador pode ser a primeira ação sensível da sessão.
+/// Falha mantém o diálogo aberto (não finge sucesso, não perde a forma de
+/// pagamento já escolhida).
+Future<void> confirmEndRental(BuildContext context, ActiveRentalsCubit cubit) async {
+  final inPosto = context.read<PostoSessionCubit>().state.mode == PostoMode.monitor;
+  if (!inPosto && !await ensureOperatorSession(context)) return;
+  if (!context.mounted) return;
+  try {
+    await cubit.confirmEnd();
+    if (context.mounted) Navigator.of(context).pop();
+  } catch (e) {
+    if (context.mounted) showRentalActionError(context, e);
+  }
 }
 
 /// Opens the "Adicionar brinquedo" form as a modal bottom sheet.

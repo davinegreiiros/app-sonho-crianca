@@ -108,13 +108,15 @@ class NewRentalCubit extends Cubit<NewRentalState> {
 
   void setCustomRate(double? v) => emit(state.copyWith(customRatePerMinute: v));
 
-  /// [createdByMonitorName]: quem está no posto quando a sheet foi aberta
-  /// a partir de [MonitorPostoView] (spec 023-posto-monitor-painel) —
-  /// `null` em modo administrador (call site lê `PostoSessionCubit`, não
-  /// este Cubit, ver `plan.md`).
-  Rental submit({String? createdByMonitorName}) {
+  /// Cria a locação no backend (spec 026-rental-via-backend: sessão de
+  /// operador real, já garantida ao abrir o posto ou pela guarda de login
+  /// em modo administrador — ver `modal_launchers.dart`/Views que chamam
+  /// isto). Deixa `ApiUnauthorizedException`/`ApiNetworkException`/
+  /// `ApiException` subir — quem chama decide a UI (mesmo padrão de
+  /// `ToyRepository`).
+  Future<Rental> submit() async {
     final s = state;
-    final rental = _rentalRepository.addNew(
+    final rental = await _rentalRepository.addNew(
       toyId: s.toyId,
       childName: s.childName.trim(),
       guardianName: s.guardianName.trim().isEmpty ? '—' : s.guardianName.trim(),
@@ -124,7 +126,6 @@ class NewRentalCubit extends Cubit<NewRentalState> {
       // Captured once, here — never re-derived from the toy later (see
       // the field's doc on `Rental`).
       ratePerMinute: s.openEnded ? (s.customRatePerMinute ?? s.suggestedRatePerMinute) : null,
-      createdByMonitorName: createdByMonitorName,
     );
     _scheduleRentalEndNotifications(rental, s.toy, _notifications);
     return rental;

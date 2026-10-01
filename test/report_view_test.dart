@@ -8,17 +8,18 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:sonho_de_crianca/data/repositories/rental_repository.dart';
 import 'package:sonho_de_crianca/main.dart';
 import 'package:sonho_de_crianca/ui/features/app_shell/view_models/app_shell_cubit.dart';
 import 'package:sonho_de_crianca/ui/features/app_shell/view_models/app_shell_state.dart';
+
+import 'fakes/fake_rental_backend.dart';
 
 Future<void> _pumpApp(WidgetTester tester) async {
   // Totals asserted below come from the demo seed (h1/h2/h3 finished
   // today) — spec 020-persistencia-local: the real app's default
   // RentalRepository starts empty, so this test asks for the seed
   // explicitly.
-  await tester.pumpWidget(SonhoDeCriancaApp(rentalRepository: RentalRepository.withDemoSeed(), startInPostoAdminMode: true));
+  await tester.pumpWidget(SonhoDeCriancaApp(rentalRepository: fakeSeededRentalRepository(), startInPostoAdminMode: true));
   await tester.pump(const Duration(milliseconds: 400));
   // Navigation lives in AppShellCubit (spec 021-migracao-shell-app), not
   // AppState, since home_shell.dart/app_bottom_nav.dart/app_header.dart

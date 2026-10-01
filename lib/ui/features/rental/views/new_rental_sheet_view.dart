@@ -6,6 +6,8 @@ import '../../../../test_keys.dart';
 import '../../../../theme/app_colors.dart';
 import '../../../../widgets/animations/pressable.dart';
 import '../../../../widgets/animations/print_strip.dart';
+import '../../../../widgets/auth_gate.dart';
+import '../../../../widgets/rental_action_error.dart';
 import '../../posto/view_models/posto_session_cubit.dart';
 import '../../posto/view_models/posto_session_state.dart';
 import '../view_models/new_rental_cubit.dart';
@@ -242,12 +244,7 @@ class NewRentalSheetView extends StatelessWidget {
                     child: Pressable(
                       child: ElevatedButton(
                         key: TestKeys.submitNewRentalButton,
-                        onPressed: draft.canSubmit
-                            ? () {
-                                cubit.submit(createdByMonitorName: fromPosto ? postoState.monitorName : null);
-                                Navigator.of(context).pop();
-                              }
-                            : null,
+                        onPressed: draft.canSubmit ? () => _submit(context, cubit, fromPosto: fromPosto) : null,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.accent,
                           foregroundColor: AppColors.bg,
@@ -269,6 +266,21 @@ class NewRentalSheetView extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// Guarda de login (spec 026-rental-via-backend): no fluxo do posto
+/// (`fromPosto`), a sessão real já existe desde que o turno abriu —
+/// `ensureOperatorSession` só confirma, não pede nada de novo. Em modo
+/// administrador, pode ser a primeira ação sensível da sessão.
+Future<void> _submit(BuildContext context, NewRentalCubit cubit, {required bool fromPosto}) async {
+  if (!fromPosto && !await ensureOperatorSession(context)) return;
+  if (!context.mounted) return;
+  try {
+    await cubit.submit();
+    if (context.mounted) Navigator.of(context).pop();
+  } catch (e) {
+    if (context.mounted) showRentalActionError(context, e);
   }
 }
 
