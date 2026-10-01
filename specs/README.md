@@ -49,5 +49,6 @@ Sem `spec.md` aprovado, sem código de feature. Bugfix simples e chore não prec
 | [023](023-posto-monitor-painel/spec.md) | Posto do monitor + fechamento de turno + painel administrativo | Implemented | 010, 020 |
 | [024](024-sync-backend-fundacao/spec.md) | Sync com backend — login de operador + `BusinessSettings` via HTTP | Implemented | 022, backend#001 |
 | [025](025-catalogo-sessao-dispositivo/spec.md) | Catálogo via backend + sessão de dispositivo | Implemented | 024 |
+| [026](026-rental-via-backend/spec.md) | Rental via backend — login real por turno | Implemented | 025 |
 
 Todas em `Draft` — cada uma tem "Dúvidas em aberto" que precisa de resposta sua antes de virar `Approved` e ganhar `plan.md`/`tasks.md`.

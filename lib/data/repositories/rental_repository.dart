@@ -1,49 +1,58 @@
-import 'dart:async' show unawaited;
-
 import 'package:flutter/foundation.dart';
 
 import '../../domain/models/rental.dart';
-import '../services/rental_local_service.dart';
+import '../services/api_exceptions.dart';
+import '../services/rental_remote_service.dart';
+import 'auth_repository.dart';
 
 /// Single source of truth for the toy-rental list (spec
-/// 013-migracao-rental-repository-fundacao).
+/// 013-migracao-rental-repository-fundacao; sincronizado com o backend a
+/// partir da 026-rental-via-backend) — one shared instance (wired in
+/// `main.dart`).
 ///
-/// `Rental` is a mutable domain model by design (see
-/// `lib/domain/models/rental.dart`) — mutating a field on a `Rental`
-/// already in [rentals] needs no method here: it's the same object
-/// instance, visible to every reader, whether or not this repository is
-/// involved.
+/// Duas sessões diferentes (mesma decisão da 025 pra `Toy`, ver
+/// `specs/026-rental-via-backend/spec.md` — "Decisão: login real por
+/// turno"): [load] (leitura, todo mundo, inclusive o posto) usa
+/// `AuthRepository.deviceToken`; as mutações ([addNew]/[extend]/[cancel]/
+/// [finish]) usam `AuthRepository.token` — a sessão de operador real,
+/// obtida uma vez ao abrir o posto (ou sob demanda em modo administrador).
 ///
-/// [rentals] is the live, directly-mutable list itself — not
-/// `List.unmodifiable`. `AppState` (e outros testes) já dependem de
-/// `rentals` ser indexável/mutável em lugar (ex.: substituir um elemento
-/// por índice pra "voltar no tempo" um `Rental`, já que `startedAt` é
-/// `final`). Por isso [load] nunca reatribui [rentals] (é `final`) — só
-/// limpa e repopula em lugar.
-///
-/// Persistência (spec 020-persistencia-local): [_localService], quando
-/// injetado (sempre em `main.dart`; `null` na maioria dos testes), faz
-/// [load] hidratar do SQLite e cada mutação persistir em background —
-/// mesmo padrão otimista de `ToyRepository`. O construtor default começa
-/// **vazio**: o app real nunca semeia locação fictícia, só o catálogo tem
-/// seed inicial. [withDemoSeed] existe só pra teste, ver doc no construtor.
+/// [rentals] continua a mesma lista mutável de sempre (não
+/// `List.unmodifiable`) — vários Cubits e alguns testes (ex.
+/// `posto_monitor_painel_test.dart`) dependem de poder inserir/ler nela
+/// diretamente. Mutações desta classe nunca reatribuem [rentals] (é
+/// `final`): usam `clear`/`addAll`/`add`/índice, preservando a mesma
+/// instância pro ciclo de vida do Repository.
 class RentalRepository extends ChangeNotifier {
-  RentalRepository({RentalLocalService? localService})
-      : rentals = [],
-        _localService = localService;
+  RentalRepository({required RentalRemoteService service, required AuthRepository authRepository})
+      : _service = service,
+        _authRepository = authRepository,
+        rentals = [];
 
-  /// Mesma lista de 11 locações de demonstração (`a1`-`a3` ativas,
-  /// `h1`-`h8` finalizadas) que `RentalRepository()` sempre semeou antes da
-  /// spec 020 — vários testes dependem implicitamente desses dados. O app
-  /// real nunca usa este construtor: `main.dart` usa `RentalRepository()`
-  /// (vazio) + `load()`.
-  RentalRepository.withDemoSeed({RentalLocalService? localService})
-      : rentals = _seedInitial(),
-        _localService = localService;
+  /// Nasce com as 11 locações de demonstração (`a1`-`a3` ativas, `h1`-`h8`
+  /// finalizadas) que `RentalRepository()` sempre semeou antes da spec
+  /// 026 — vários testes dependem desses dados sem bater em backend
+  /// nenhum. O app real nunca usa este construtor.
+  @visibleForTesting
+  RentalRepository.withDemoSeed({required RentalRemoteService service, required AuthRepository authRepository})
+      : _service = service,
+        _authRepository = authRepository,
+        rentals = _seedInitial();
 
+  /// Mesma lista de [withDemoSeed], exposta pra um teste poder semear o
+  /// *backend fake* com os mesmos ids (`a1`-`a3`/`h1`-`h8`) — sem isso,
+  /// `extend`/`cancel`/`finish` numa locação seedada bateria 404 contra
+  /// um fake que nunca ouviu falar desses ids (o construtor só popula a
+  /// lista local, não o "servidor").
+  @visibleForTesting
+  static List<Rental> demoSeedForTest() => _seedInitial();
+
+  final RentalRemoteService _service;
+  final AuthRepository _authRepository;
   final List<Rental> rentals;
-  final RentalLocalService? _localService;
 
+  /// Set by [dispose] — mesmo motivo que os outros Repositories: um
+  /// `await` em voo pode resolver depois deste já ter sido descartado.
   bool _disposed = false;
 
   static List<Rental> _seedInitial() {
@@ -72,27 +81,43 @@ class RentalRepository extends ChangeNotifier {
     ];
   }
 
-  /// Hidrata do banco local. Sem [_localService] (a maioria dos testes),
-  /// não faz nada — [rentals] fica no default do construtor usado (`[]` ou
-  /// a seed de demonstração). Com [_localService]: substitui o conteúdo de
-  /// [rentals] pelo que está persistido (vazio na primeira execução real —
-  /// sem seed de demonstração, ver classe acima).
+  /// Busca o histórico no backend com a sessão de dispositivo (todas as
+  /// páginas do cursor, ver `RentalRemoteService.loadAll`). Nunca propaga
+  /// erro: sem rede, sem `deviceToken` configurado, ou 401 deixam
+  /// [rentals] como estava (seed/último fetch bom) — mesma régua da 025
+  /// pro catálogo (cenário 5: fluxo principal do dia a dia não pode
+  /// travar por conectividade). Sem retry de relogin aqui: `main.dart` já
+  /// encadeia `loginDevice()` antes de chamar isto.
   Future<void> load() async {
-    final service = _localService;
-    if (service == null) return;
-    final loaded = await service.loadAll();
-    if (_disposed) return;
-    rentals
-      ..clear()
-      ..addAll(loaded);
-    notifyListeners();
+    try {
+      final loaded = await _service.loadAll(token: _authRepository.deviceToken);
+      if (_disposed) return;
+      rentals
+        ..clear()
+        ..addAll(loaded);
+      notifyListeners();
+    } catch (e) {
+      debugPrint('RentalRepository: falha ao carregar locações: $e');
+    }
   }
 
-  /// Builds a new active `Rental` (same id scheme `AppState.submitNew`
-  /// always used — a microsecond timestamp — spec
-  /// 017-migracao-nova-locacao) and adds it. `startedAt` is always "now"
-  /// — a rental starts the moment it's created.
-  Rental addNew({
+  String _requireOperatorToken() {
+    final token = _authRepository.token;
+    if (token == null) throw const ApiUnauthorizedException('Sessão de operador necessária');
+    return token;
+  }
+
+  /// Cria a locação no backend (sessão de operador real — já garantida ao
+  /// abrir o posto, ou pela guarda de login em modo administrador). Sem
+  /// sessão, lança antes de tocar em [rentals]. `createdByMonitorName` é
+  /// preenchido aqui, localmente, com [createdByMonitorName] — nome
+  /// digitado em "Quem é você hoje" (spec 023, `null` em modo
+  /// administrador), **não** o nome de quem está logado: a sessão de
+  /// operador real só serve pra autenticar a escrita no backend (spec
+  /// 026 — "login fica só com o administrador"), nunca representa quem
+  /// de fato está operando o posto. O backend não devolve nome nenhum
+  /// (só `createdByOperatorId`), então isso nunca viria de lá mesmo.
+  Future<Rental> addNew({
     required String toyId,
     required String childName,
     required String guardianName,
@@ -101,82 +126,109 @@ class RentalRepository extends ChangeNotifier {
     required double price,
     required double? ratePerMinute,
     String? createdByMonitorName,
-  }) {
-    final rental = Rental(
-      id: 'r${DateTime.now().microsecondsSinceEpoch}',
+  }) async {
+    final token = _requireOperatorToken();
+    final rental = await _service.create(
       toyId: toyId,
       childName: childName,
       guardianName: guardianName,
       guardianPhone: guardianPhone,
       startedAt: DateTime.now(),
       durationMin: durationMin,
-      price: price,
-      status: RentalStatus.active,
       ratePerMinute: ratePerMinute,
-      createdByMonitorName: createdByMonitorName,
+      price: price,
+      token: token,
     );
-    add(rental);
+    rental.createdByMonitorName = createdByMonitorName;
+    if (!_disposed) {
+      rentals.add(rental);
+      notifyListeners();
+    }
     return rental;
   }
 
-  void add(Rental rental) {
-    rentals.add(rental);
-    notifyListeners();
-    unawaited(_persist(rental));
-  }
-
-  void removeById(String id) {
-    rentals.removeWhere((r) => r.id == id);
-    notifyListeners();
-    unawaited(_delete(id));
-  }
-
-  /// Adds `addMinutes`-worth of duration/price to an active fixed-duration
-  /// rental (the caller computes the new values — the rate/minute formula
-  /// needs `Toy` data this repository deliberately doesn't have) and
-  /// notifies. Spec 018-migracao-locacao-ativa-encerrar: before this,
-  /// `AppState.extendActive` mutated the `Rental` in place without ever
-  /// calling this repository's `notifyListeners()`, so `ReportCubit`/
-  /// `ToyCatalogCubit` (which only listen here) never found out a rental
-  /// had been extended — this method is the fix, used by both worlds.
-  void extend(String rentalId, {required int durationMin, required double price}) {
-    final r = rentals.firstWhere((r) => r.id == rentalId, orElse: () => rentals.first);
+  /// `durationMin` é o novo total absoluto (mesmo contrato que
+  /// `ActiveRentalsCubit.extendActive` já usa) — a rota do backend espera
+  /// o **incremento**, não o total, então o delta é calculado aqui antes
+  /// de chamar o service (ver `plan.md`).
+  Future<void> extend(String rentalId, {required int durationMin, required double price}) async {
+    final token = _requireOperatorToken();
+    final index = rentals.indexWhere((r) => r.id == rentalId);
+    if (index == -1) return;
+    final r = rentals[index];
+    final previousDuration = r.durationMin;
+    final previousPrice = r.price;
+    final addMinutes = durationMin - (previousDuration ?? 0);
     r.durationMin = durationMin;
     r.price = price;
     notifyListeners();
-    unawaited(_persist(r));
-  }
-
-  /// Marks a rental done and notifies — same "AppState mutated without
-  /// notifying this repository" gap [extend] fixes, now for `confirmEnd`.
-  /// [finalPrice] is only passed for an open-ended rental (the caller —
-  /// `AppState`/`ActiveRentalsCubit` — decides; a fixed-duration rental's
-  /// price never changes at finish time).
-  void finish(String rentalId, PaymentMethod method, {double? finalPrice, String? finishedByMonitorName}) {
-    final r = rentals.firstWhere((r) => r.id == rentalId, orElse: () => rentals.first);
-    if (finalPrice != null) r.price = finalPrice;
-    r.finish(method, finishedByMonitorName: finishedByMonitorName);
-    notifyListeners();
-    unawaited(_persist(r));
-  }
-
-  Future<void> _persist(Rental rental) async {
-    final service = _localService;
-    if (service == null) return;
     try {
-      await service.upsert(rental);
+      await _service.extend(rentalId, addMinutes, token: token);
     } catch (e) {
-      debugPrint('RentalRepository: falha ao persistir locação ${rental.id}: $e');
+      if (!_disposed) {
+        r.durationMin = previousDuration;
+        r.price = previousPrice;
+        notifyListeners();
+      }
+      rethrow;
     }
   }
 
-  Future<void> _delete(String id) async {
-    final service = _localService;
-    if (service == null) return;
+  /// Cancela uma locação ativa (sem pagamento) — o backend marca `done`
+  /// com `paymentMethod: null`, não deleta (ver `spec.md`, "Achado
+  /// durante o planejamento"); [rentals] reflete esse mesmo estado em vez
+  /// de remover o item (comportamento local anterior, pré-026).
+  Future<void> cancel(String rentalId) async {
+    final token = _requireOperatorToken();
+    final index = rentals.indexWhere((r) => r.id == rentalId);
+    if (index == -1) return;
+    final r = rentals[index];
+    final previousStatus = r.status;
+    final previousEndedAt = r.endedAt;
+    r.status = RentalStatus.done;
+    r.endedAt = DateTime.now();
+    notifyListeners();
     try {
-      await service.delete(id);
+      await _service.cancel(rentalId, token: token);
     } catch (e) {
-      debugPrint('RentalRepository: falha ao remover locação $id: $e');
+      if (!_disposed) {
+        r.status = previousStatus;
+        r.endedAt = previousEndedAt;
+        notifyListeners();
+      }
+      rethrow;
+    }
+  }
+
+  /// Marca a locação finalizada (paga) — [finalPrice] só pra uma locação
+  /// de tempo corrido (preço fixo nunca muda ao finalizar, mesmo contrato
+  /// de sempre). [finishedByMonitorName]: mesmo rótulo local de
+  /// [addNew], não quem está logado (ver doc ali).
+  Future<void> finish(String rentalId, PaymentMethod method, {double? finalPrice, String? finishedByMonitorName}) async {
+    final token = _requireOperatorToken();
+    final index = rentals.indexWhere((r) => r.id == rentalId);
+    if (index == -1) return;
+    final r = rentals[index];
+    final previousStatus = r.status;
+    final previousEndedAt = r.endedAt;
+    final previousPaymentMethod = r.paymentMethod;
+    final previousPrice = r.price;
+    final previousFinishedBy = r.finishedByMonitorName;
+    if (finalPrice != null) r.price = finalPrice;
+    r.finish(method, finishedByMonitorName: finishedByMonitorName);
+    notifyListeners();
+    try {
+      await _service.finish(rentalId, method, token: token);
+    } catch (e) {
+      if (!_disposed) {
+        r.status = previousStatus;
+        r.endedAt = previousEndedAt;
+        r.paymentMethod = previousPaymentMethod;
+        r.price = previousPrice;
+        r.finishedByMonitorName = previousFinishedBy;
+        notifyListeners();
+      }
+      rethrow;
     }
   }
 

@@ -51,7 +51,7 @@ class ReportCubit extends Cubit<ReportState> {
   static ReportState _compute(ReportPeriod period, List<Rental> rentals, List<Toy> toys) {
     final cutoff = _cutoffFor(period);
     final filtered = rentals
-        .where((r) => r.status == RentalStatus.done && r.endedAt != null && !r.endedAt!.isBefore(cutoff))
+        .where((r) => r.isCompleted && r.endedAt != null && !r.endedAt!.isBefore(cutoff))
         .toList();
 
     final total = filtered.fold(0.0, (a, r) => a + r.price);

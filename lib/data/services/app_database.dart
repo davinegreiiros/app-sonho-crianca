@@ -2,8 +2,14 @@ import 'package:path/path.dart' show join;
 import 'package:sqflite/sqflite.dart';
 
 /// Único ponto de acesso ao banco SQLite físico do app (spec
-/// 020-persistencia-local). `ToyLocalService`/`RentalLocalService` recebem
-/// esta classe no construtor — nenhum outro lugar do app abre um banco.
+/// 020-persistencia-local). `ToyLocalService` (removido na spec
+/// 025-catalogo-sessao-dispositivo) e `RentalLocalService` (removido na
+/// spec 026-rental-via-backend) recebiam esta classe no construtor —
+/// `Toy`/`Rental` agora vêm do backend, não têm mais nenhum chamador real
+/// aqui. As tabelas `toys`/`rentals` ficam no schema sem uso (nunca
+/// removidas — instalação existente não perde dado, constitution.md), só
+/// `turnos` (controle de turno local, nunca sincronizado) continua lida/
+/// escrita de verdade.
 ///
 /// Usa as funções globais `openDatabase`/`getDatabasesPath` do pacote
 /// `sqflite`, que delegam pro `databaseFactory` ativo — o real em produção,

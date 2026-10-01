@@ -13,6 +13,16 @@ import '../view_models/posto_session_state.dart';
 /// a posto, livre ou ocupado (com quem), campo de nome só aparece depois
 /// de tocar num posto livre — tocar num posto ocupado retoma o turno
 /// direto (cenário 2 do spec, sem pedir nome de novo).
+///
+/// Nome livre, **sem conta** (spec 026-rental-via-backend: decisão
+/// revisada — ver `spec.md`, "Correção — login fica só com o
+/// administrador"). Monitores rotativos não têm Operator cadastrado;
+/// `Turno.monitorName`/`createdByMonitorName` continuam um rótulo local,
+/// nunca verificado. A sessão de operador real que o backend exige pra
+/// escrita (`Rental`) é obtida em outro ponto — na primeira ação de
+/// dinheiro (`ensureOperatorSession` em `new_rental_sheet_view.dart`/
+/// `modal_launchers.dart`), tipicamente só uma vez, pelo administrador,
+/// pro aparelho inteiro (sessão persiste em `flutter_secure_storage`).
 class OpenPostoView extends StatefulWidget {
   const OpenPostoView({super.key});
 

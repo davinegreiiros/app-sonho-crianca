@@ -41,7 +41,7 @@ class AdminPanelCubit extends Cubit<AdminPanelState> {
 
   static AdminPanelState _compute(List<Rental> rentals, List<Toy> toys, List<Turno> turnos) {
     final startOfDay = _startOfDay;
-    final doneToday = rentals.where((r) => r.status == RentalStatus.done && r.endedAt != null && !r.endedAt!.isBefore(startOfDay)).toList();
+    final doneToday = rentals.where((r) => r.isCompleted && r.endedAt != null && !r.endedAt!.isBefore(startOfDay)).toList();
 
     final totalGrossToday = doneToday.fold(0.0, (a, r) => a + r.price);
 
@@ -60,7 +60,7 @@ class AdminPanelCubit extends Cubit<AdminPanelState> {
       final inTurno = rentals.where(
         (r) =>
             r.toyId == turno.toyId &&
-            r.status == RentalStatus.done &&
+            r.isCompleted &&
             r.endedAt != null &&
             !r.endedAt!.isBefore(turno.openedAt) &&
             !r.endedAt!.isAfter(windowEnd) &&

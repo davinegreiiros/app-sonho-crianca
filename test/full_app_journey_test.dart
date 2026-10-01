@@ -24,12 +24,19 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:sonho_de_crianca/data/repositories/rental_repository.dart';
+import 'package:sonho_de_crianca/data/services/api_client.dart';
+import 'package:sonho_de_crianca/data/services/rental_remote_service.dart';
+import 'package:sonho_de_crianca/domain/models/toy.dart';
 import 'package:sonho_de_crianca/main.dart';
 import 'package:sonho_de_crianca/state/app_state.dart';
 import 'package:sonho_de_crianca/test_keys.dart';
 import 'package:sonho_de_crianca/ui/features/catalog/views/add_toy_sheet_view.dart';
+import 'package:sonho_de_crianca/ui/features/rental/view_models/new_rental_cubit.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'fakes/fake_business_settings.dart';
+import 'fakes/fake_rental_backend.dart';
+import 'fakes/fake_toy_backend.dart';
 
 const _settle = Duration(milliseconds: 400);
 
@@ -53,8 +60,15 @@ Future<AppState> _pumpApp(WidgetTester tester, {RentalRepository? rentalReposito
   // `pix_flow_test.dart`/`catalog_tickets_test.dart` already do.
   final authRepository = fakeLoggedInAuthRepository();
   await tester.pumpWidget(SonhoDeCriancaApp(
-    rentalRepository: rentalRepository,
+    // spec 026: sem fake explícito, cairia no RentalRepository real
+    // (produção) assim que qualquer ação de locação disparasse.
+    rentalRepository: rentalRepository ??
+        RentalRepository(
+          service: RentalRemoteService(ApiClient(httpClient: fakeRentalBackend())),
+          authRepository: authRepository,
+        ),
     authRepository: authRepository,
+    toyRepository: fakeToyRepository(initial: kInitialToys, authRepository: authRepository),
     businessSettingsRepository: fakeBusinessSettingsRepository(authRepository: authRepository),
     startInPostoAdminMode: true,
   ));
@@ -151,15 +165,15 @@ void main() {
 
       const childName = 'Teste Jornada Completa';
 
-      // Creation itself goes through AppState directly (same convention
-      // `test/catalog_tickets_test.dart`/`test/open_ended_rental_test.dart`
-      // already use) — typing into a focused field inside a scrolled,
-      // modal sheet is exactly what `integration_test/app_test.dart`
-      // exists for, on a real device/keyboard. What matters here is that
-      // the rental created this way is visible/actionable through every
+      // Creation via NewRentalCubit direto (AppState.submitNew removido na
+      // spec 026) — typing into a focused field inside a scrolled, modal
+      // sheet is exactly what `integration_test/app_test.dart` exists
+      // for, on a real device/keyboard. What matters here is that the
+      // rental created this way is visible/actionable through every
       // migrated screen below (Active, Home, Report).
-      appState.setDraftChild(childName);
-      appState.submitNew();
+      final newRentalCubit = BlocProvider.of<NewRentalCubit>(tester.element(find.byType(MaterialApp)), listen: false);
+      newRentalCubit.setChildName(childName);
+      await newRentalCubit.submit();
       await tester.pump(_settle);
 
       final rental = appState.rentals.firstWhere((r) => r.childName == childName);
@@ -203,7 +217,7 @@ void main() {
     });
 
     testWidgets('cancels an active rental', (tester) async {
-      final appState = await _pumpApp(tester, rentalRepository: RentalRepository.withDemoSeed());
+      final appState = await _pumpApp(tester, rentalRepository: fakeSeededRentalRepository());
 
       final before = appState.activeRentals.length;
       final target = appState.activeRentals.first;

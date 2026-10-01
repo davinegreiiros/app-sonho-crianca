@@ -6,6 +6,8 @@ import '../../../../test_keys.dart';
 import '../../../../theme/app_colors.dart';
 import '../../../../widgets/animations/pressable.dart';
 import '../../../../widgets/animations/print_strip.dart';
+import '../../../../widgets/auth_gate.dart';
+import '../../../../widgets/rental_action_error.dart';
 import '../../posto/view_models/posto_session_cubit.dart';
 import '../../posto/view_models/posto_session_state.dart';
 import '../view_models/new_rental_cubit.dart';
@@ -243,10 +245,7 @@ class NewRentalSheetView extends StatelessWidget {
                       child: ElevatedButton(
                         key: TestKeys.submitNewRentalButton,
                         onPressed: draft.canSubmit
-                            ? () {
-                                cubit.submit(createdByMonitorName: fromPosto ? postoState.monitorName : null);
-                                Navigator.of(context).pop();
-                              }
+                            ? () => _submit(context, cubit, createdByMonitorName: fromPosto ? postoState.monitorName : null)
                             : null,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.accent,
@@ -269,6 +268,25 @@ class NewRentalSheetView extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// Guarda de login (spec 026-rental-via-backend — "login fica só com o
+/// administrador"): sempre checa sessão de operador real, posto ou
+/// administrador — mas como a sessão persiste no aparelho
+/// (`flutter_secure_storage`, spec 024), na prática só pede login uma
+/// vez, pra quem configurou o aparelho (o administrador); nenhum
+/// monitor rotativo precisa logar depois disso. [createdByMonitorName]
+/// é o rótulo local de quem está no posto (ver `NewRentalCubit.submit`),
+/// nunca quem está logado.
+Future<void> _submit(BuildContext context, NewRentalCubit cubit, {String? createdByMonitorName}) async {
+  if (!await ensureOperatorSession(context)) return;
+  if (!context.mounted) return;
+  try {
+    await cubit.submit(createdByMonitorName: createdByMonitorName);
+    if (context.mounted) Navigator.of(context).pop();
+  } catch (e) {
+    if (context.mounted) showRentalActionError(context, e);
   }
 }
 

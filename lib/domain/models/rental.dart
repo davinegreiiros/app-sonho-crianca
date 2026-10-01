@@ -63,17 +63,26 @@ class Rental {
   DateTime? endedAt;
   PaymentMethod? paymentMethod;
 
-  /// Name typed into "Quem é você hoje" (spec 023-posto-monitor-painel)
-  /// when this rental was created from a posto session. `null` = created
-  /// in administrator mode (or data predating this spec) — not a real
-  /// account, just a per-shift label for the audit trail (3d).
-  final String? createdByMonitorName;
+  /// Nome do operador real que criou a locação (spec 026-rental-via-
+  /// backend: preenchido pelo `RentalRepository` com quem está logado no
+  /// momento, não digitado). Não é `final`: o backend devolve a locação
+  /// criada sem esse nome (só guarda `createdByOperatorId`), então
+  /// `RentalRepository.addNew` o define localmente depois da resposta.
+  String? createdByMonitorName;
 
   /// Same as [createdByMonitorName], but for whoever confirmed payment
   /// (set by [finish]).
   String? finishedByMonitorName;
 
   bool get isOpenEnded => durationMin == null;
+
+  /// `true` só pra uma locação de verdade finalizada com pagamento —
+  /// distinto de `status == RentalStatus.done`, que também vale pra uma
+  /// locação **cancelada** (spec 026-rental-via-backend: o backend não
+  /// deleta ao cancelar, marca `done` com `paymentMethod: null`). Usar
+  /// este getter em qualquer soma de receita/contagem de atendimento —
+  /// cancelamento nunca deve contar como receita.
+  bool get isCompleted => status == RentalStatus.done && paymentMethod != null;
 
   Rental finish(PaymentMethod method, {String? finishedByMonitorName}) {
     status = RentalStatus.done;

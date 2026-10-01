@@ -7,13 +7,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:sonho_de_crianca/data/repositories/rental_repository.dart';
 import 'package:sonho_de_crianca/domain/models/business_settings.dart';
 import 'package:sonho_de_crianca/main.dart';
 import 'package:sonho_de_crianca/state/app_state.dart';
 import 'package:sonho_de_crianca/test_keys.dart';
 
 import 'fakes/fake_business_settings.dart';
+import 'fakes/fake_rental_backend.dart';
 
 Future<AppState> _pumpApp(WidgetTester tester, {BusinessSettings backendSettings = const BusinessSettings()}) async {
   // Every scenario here finishes the seed's first active rental — needs
@@ -22,7 +22,7 @@ Future<AppState> _pumpApp(WidgetTester tester, {BusinessSettings backendSettings
   // it explicitly).
   final authRepository = fakeLoggedInAuthRepository();
   await tester.pumpWidget(SonhoDeCriancaApp(
-    rentalRepository: RentalRepository.withDemoSeed(),
+    rentalRepository: fakeSeededRentalRepository(authRepository: authRepository),
     authRepository: authRepository,
     businessSettingsRepository: fakeBusinessSettingsRepository(initial: backendSettings, authRepository: authRepository),
     startInPostoAdminMode: true,
