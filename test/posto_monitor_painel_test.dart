@@ -210,7 +210,7 @@ void main() {
         done('r2', endedAt: openedAt.add(const Duration(minutes: 20)), price: 40), // administrador
         done('r3', endedAt: openedAt.add(const Duration(minutes: 30)), price: 25, by: 'Ana'),
       ]);
-      final cubit = PostoSessionCubit(ToyRepository(), rentalRepository, turnoRepository);
+      final cubit = PostoSessionCubit(fakeToyRepository(), rentalRepository, turnoRepository);
 
       cubit.openOrResume('cama');
       cubit.beginClosing();
@@ -223,7 +223,7 @@ void main() {
     test('não fecha o turno com o campo de dinheiro vazio/inválido, mas aceita 0 explícito', () {
       final turnoRepository = TurnoRepository();
       turnoRepository.turnos.add(Turno(id: 't1', toyId: 'cama', monitorName: 'Gustavo', openedAt: DateTime.now()));
-      final cubit = PostoSessionCubit(ToyRepository(), RentalRepository(), turnoRepository);
+      final cubit = PostoSessionCubit(fakeToyRepository(), RentalRepository(), turnoRepository);
       cubit.openOrResume('cama');
       cubit.beginClosing();
 
@@ -250,7 +250,7 @@ void main() {
         done('r1', endedAt: now.subtract(const Duration(minutes: 20)), price: 15, by: 'Gustavo'),
         done('r2', endedAt: now.subtract(const Duration(minutes: 10)), price: 40),
       ]);
-      final cubit = AdminPanelCubit(rentalRepository, ToyRepository(), turnoRepository);
+      final cubit = AdminPanelCubit(rentalRepository, fakeToyRepository(), turnoRepository);
 
       final row = cubit.state.turnRows.single;
       expect(row.locCount, 1);
@@ -301,7 +301,7 @@ void main() {
           paymentMethod: PaymentMethod.pix,
         ),
       ]);
-      final cubit = AdminPanelCubit(rentalRepository, ToyRepository(), TurnoRepository());
+      final cubit = AdminPanelCubit(rentalRepository, fakeToyRepository(), TurnoRepository());
 
       final trail = cubit.state.trail.map((e) => (e.rental.id, e.action, e.actor)).toList();
       expect(trail, [

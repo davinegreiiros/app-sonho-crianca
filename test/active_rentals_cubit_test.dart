@@ -73,7 +73,7 @@ void main() {
     });
 
     test('1s ticker emits a new state even when the rental list is unchanged', () async {
-      final cubit = ActiveRentalsCubit(ToyRepository(), RentalRepository.withDemoSeed(), notifications: FakeRentalNotifier());
+      final cubit = ActiveRentalsCubit(fakeToyRepository(), RentalRepository.withDemoSeed(), notifications: FakeRentalNotifier());
       final emitted = <Object>[];
       final sub = cubit.stream.listen(emitted.add);
 

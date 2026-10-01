@@ -28,7 +28,7 @@ void main() {
     });
 
     test('1s ticker emits a new state even when nothing else changed', () async {
-      final cubit = HomeCubit(ToyRepository(), RentalRepository.withDemoSeed());
+      final cubit = HomeCubit(fakeToyRepository(), RentalRepository.withDemoSeed());
       final emitted = <Object>[];
       final sub = cubit.stream.listen(emitted.add);
 
