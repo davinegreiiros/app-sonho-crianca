@@ -40,6 +40,7 @@ class TestKeys {
   static const businessCityField = ValueKey('business_city_field');
   static const businessPixKeyField = ValueKey('business_pix_key_field');
   static const saveBusinessSettingsButton = ValueKey('save_business_settings_button');
+  static const manageToysButton = ValueKey('manage_toys_button');
   static const pixQrImage = ValueKey('pix_qr_image');
   static const copyPixPayloadButton = ValueKey('copy_pix_payload_button');
   static const pixQrDoneButton = ValueKey('pix_qr_done_button');

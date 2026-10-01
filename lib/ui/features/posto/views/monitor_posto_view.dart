@@ -5,9 +5,12 @@ import '../../../../data/repositories/rental_repository.dart';
 import '../../../../data/repositories/toy_repository.dart';
 import '../../../../domain/formatters.dart';
 import '../../../../domain/models/rental.dart';
+import '../../../../domain/models/toy.dart';
 import '../../../../test_keys.dart';
 import '../../../../theme/app_colors.dart';
+import '../../../../widgets/animations/print_strip.dart';
 import '../../../../widgets/modal_launchers.dart';
+import '../../../core/initials_avatar.dart';
 import '../../rental/view_models/active_rentals_cubit.dart';
 import '../view_models/posto_session_cubit.dart';
 import 'close_shift_view.dart';
@@ -38,7 +41,7 @@ class MonitorPostoView extends StatelessWidget {
         child: Column(
           children: [
             Container(
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
+              padding: const EdgeInsets.fromLTRB(14, 10, 10, 14),
               color: toy.ink.tint,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -48,27 +51,45 @@ class MonitorPostoView extends StatelessWidget {
                       IconButton(
                         key: TestKeys.exitPostoButton,
                         onPressed: () => context.read<PostoSessionCubit>().exitToSelection(),
-                        icon: Icon(Icons.arrow_back, color: toy.ink.fg, size: 20),
+                        icon: Icon(Icons.arrow_back, color: toy.ink.fg, size: 18),
                         visualDensity: VisualDensity.compact,
+                        tooltip: 'Trocar de posto',
                       ),
+                      InitialsAvatar(text: initialsOf(session.monitorName ?? ''), background: toy.ink.dot, foreground: AppColors.bg, size: 26),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           session.monitorName ?? '',
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: toy.ink.fg),
                         ),
                       ),
-                      TextButton(
+                      IconButton(
                         key: TestKeys.closeShiftButton,
+                        tooltip: 'Encerrar turno',
                         onPressed: () {
                           context.read<PostoSessionCubit>().beginClosing();
                           Navigator.of(context).push<void>(MaterialPageRoute(builder: (_) => const CloseShiftView()));
                         },
-                        child: Text('Encerrar turno', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: toy.ink.fg)),
+                        icon: Icon(Icons.receipt_long_outlined, color: toy.ink.fg, size: 19),
+                        visualDensity: VisualDensity.compact,
                       ),
                     ],
                   ),
-                  const SizedBox(height: 4),
-                  Text(toy.name, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w600, height: 1.05)),
+                  const SizedBox(height: 10),
+                  ClipRRect(borderRadius: BorderRadius.circular(2), child: const PrintStrip(height: 3)),
+                  const SizedBox(height: 10),
+                  Text(
+                    toy.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 23, fontWeight: FontWeight.w600, height: 1.1),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${rentals.length} de ${toy.qty} lugares',
+                    style: TextStyle(fontSize: 12, color: toy.ink.fg.withValues(alpha: 0.8)),
+                  ),
                 ],
               ),
             ),
@@ -88,21 +109,24 @@ class MonitorPostoView extends StatelessWidget {
                       padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
                       itemCount: rentals.length,
                       separatorBuilder: (_, __) => const SizedBox(height: 10),
-                      itemBuilder: (context, i) => _PostoRentalRow(rental: rentals[i]),
+                      itemBuilder: (context, i) => _PostoRentalRow(rental: rentals[i], toy: toy),
                     ),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-              child: ElevatedButton.icon(
-                onPressed: () => showNewRentalSheet(context, lockedToyId: toyId),
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('Colocar criança'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.accent2,
-                  foregroundColor: AppColors.bg,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                  textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => showNewRentalSheet(context, lockedToyId: toyId),
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('Colocar criança'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.accent2,
+                    foregroundColor: AppColors.bg,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                    textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                  ),
                 ),
               ),
             ),
@@ -118,11 +142,21 @@ class MonitorPostoView extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('SEU TURNO', style: TextStyle(fontSize: 9.5, letterSpacing: 1, fontWeight: FontWeight.w600, color: AppColors.text.withValues(alpha: 0.55))),
+                        Text(
+                          'SEU TURNO · ${toy.name}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 9.5, letterSpacing: 1, fontWeight: FontWeight.w600, color: AppColors.text.withValues(alpha: 0.55)),
+                        ),
                         Text(formatMoney(turnoGross), style: const TextStyle(fontSize: 23, fontWeight: FontWeight.w600)),
                       ],
                     ),
                   ),
+                  if (session.turnoOpenedAt != null)
+                    Text(
+                      'desde ${session.turnoOpenedAt!.hour.toString().padLeft(2, '0')}:${session.turnoOpenedAt!.minute.toString().padLeft(2, '0')}',
+                      style: TextStyle(fontSize: 11, color: AppColors.text.withValues(alpha: 0.55)),
+                    ),
                 ],
               ),
             ),
@@ -144,19 +178,54 @@ class MonitorPostoView extends StatelessWidget {
   }
 }
 
+/// Mesma fórmula de `ActiveTabView._statusColor` (ported, só esta linha de
+/// 3b também precisa — design source artboard 3b mostra o relógio de cada
+/// ocupante, não só o valor).
+Color _statusColor(double ratio, bool overtime) {
+  if (overtime || ratio <= 0.2) return AppColors.statusUrgent;
+  if (ratio <= 0.5) return AppColors.statusWarn;
+  return AppColors.statusOk;
+}
+
+String _fmtClock(double remainMin) {
+  final overtime = remainMin < 0;
+  final abs = remainMin.abs();
+  final mm = abs.floor();
+  final ss = ((abs - mm) * 60).round();
+  String pad(int n) => n.toString().padLeft(2, '0');
+  return '${overtime ? '+' : ''}${pad(mm)}:${pad(ss)}';
+}
+
+String _fmtElapsed(double elapsedMin) {
+  final mm = elapsedMin.floor();
+  final ss = ((elapsedMin - mm) * 60).round();
+  String pad(int n) => n.toString().padLeft(2, '0');
+  return '${pad(mm)}:${pad(ss)}';
+}
+
 class _PostoRentalRow extends StatelessWidget {
-  const _PostoRentalRow({required this.rental});
+  const _PostoRentalRow({required this.rental, required this.toy});
   final Rental rental;
+  final Toy toy;
 
   @override
   Widget build(BuildContext context) {
     final cubit = context.read<ActiveRentalsCubit>();
     final value = cubit.computeFinalPrice(rental);
+    final openEnded = rental.isOpenEnded;
+    final elapsedMin = DateTime.now().difference(rental.startedAt).inMilliseconds / 60000;
+    final duration = rental.durationMin;
+    final remainMin = openEnded ? 0.0 : duration! - elapsedMin;
+    final overtime = !openEnded && remainMin < 0;
+    final clockColor = openEnded ? AppColors.accent2_700 : _statusColor(remainMin / duration!, overtime);
+    final clockText = openEnded ? _fmtElapsed(elapsedMin) : _fmtClock(overtime ? 0.0 : remainMin);
     return Container(
       padding: const EdgeInsets.all(13),
-      decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(4)),
+      decoration: BoxDecoration(color: toy.ink.tint, borderRadius: BorderRadius.circular(4)),
       child: Row(
         children: [
+          InitialsAvatar(text: initialsOf(rental.childName), background: toy.ink.dot, foreground: AppColors.bg, size: 34),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -166,7 +235,16 @@ class _PostoRentalRow extends StatelessWidget {
               ],
             ),
           ),
-          Text(formatMoney(value), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                clockText,
+                style: TextStyle(fontFamily: 'monospace', fontSize: 15, fontWeight: FontWeight.w600, color: clockColor),
+              ),
+              Text(formatMoney(value), style: TextStyle(fontSize: 11, color: AppColors.text.withValues(alpha: 0.65))),
+            ],
+          ),
           const SizedBox(width: 10),
           ElevatedButton(
             key: TestKeys.finishRentalButton(rental.id),

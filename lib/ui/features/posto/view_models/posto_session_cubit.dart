@@ -93,7 +93,7 @@ class PostoSessionCubit extends Cubit<PostoSessionState> {
     final expected = <PaymentMethod, double>{
       for (final m in PaymentMethod.values) m: finished.where((r) => r.paymentMethod == m).fold(0.0, (a, r) => a + r.price),
     };
-    emit(state.copyWith(closingExpectedByMethod: expected, closingCountedCashInput: ''));
+    emit(state.copyWith(closingExpectedByMethod: expected, closingCountedCashInput: '', closingLocCount: finished.length));
   }
 
   void setClosingCountedCash(String raw) => emit(state.copyWith(closingCountedCashInput: raw));

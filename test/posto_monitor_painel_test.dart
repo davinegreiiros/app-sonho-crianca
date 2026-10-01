@@ -68,6 +68,19 @@ void main() {
     expect(turnoRepository.turnos.single.isOpen, isTrue);
   });
 
+  testWidgets('tocar um posto livre destaca qual brinquedo foi selecionado', (tester) async {
+    await tester.pumpWidget(SonhoDeCriancaApp(turnoRepository: TurnoRepository()));
+    await _settle(tester);
+
+    expect(find.text('VOCÊ'), findsNothing);
+
+    await tester.tap(find.byKey(TestKeys.postoRow('cama')));
+    await tester.pump();
+
+    expect(find.descendant(of: find.byKey(TestKeys.postoRow('cama')), matching: find.text('VOCÊ')), findsOneWidget);
+    expect(find.text('Seu nome no posto · Cama Elástica'), findsOneWidget);
+  });
+
   testWidgets('tocar um posto já ocupado retoma o mesmo turno, sem duplicar', (tester) async {
     final turnoRepository = TurnoRepository();
     final existing = turnoRepository.open('cama', 'Ana');
@@ -75,7 +88,7 @@ void main() {
     await tester.pumpWidget(SonhoDeCriancaApp(turnoRepository: turnoRepository));
     await _settle(tester);
 
-    expect(find.text('Com Ana'), findsOneWidget);
+    expect(find.textContaining('Ana · turno desde'), findsOneWidget);
 
     await tester.tap(find.byKey(TestKeys.postoRow('cama')));
     await _settle(tester);
@@ -127,7 +140,7 @@ void main() {
 
     // Volta pra 3a, posto livre de novo.
     expect(find.byKey(TestKeys.postoNameField), findsNothing);
-    expect(find.text('Livre'), findsWidgets);
+    expect(find.text('LIVRE'), findsWidgets);
     final turno = turnoRepository.turnos.single;
     expect(turno.isOpen, isFalse);
     expect(turno.countedCash, 15);
@@ -163,7 +176,7 @@ void main() {
     await _settle(tester);
 
     expect(find.text(formatMoney(15)), findsWidgets);
-    expect(find.text('1 locações'), findsOneWidget);
+    expect(find.textContaining('1 locações'), findsOneWidget);
     expect(find.text('Gustavo'), findsWidgets); // linha do turno + autor na trilha
     expect(find.textContaining('Encerrou'), findsOneWidget);
   });

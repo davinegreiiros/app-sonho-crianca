@@ -27,6 +27,7 @@ class PostoSessionState extends Equatable {
     required this.postos,
     required this.closingExpectedByMethod,
     required this.closingCountedCashInput,
+    required this.closingLocCount,
   });
 
   const PostoSessionState.initial()
@@ -37,7 +38,8 @@ class PostoSessionState extends Equatable {
         turnoOpenedAt = null,
         postos = const [],
         closingExpectedByMethod = const {},
-        closingCountedCashInput = '';
+        closingCountedCashInput = '',
+        closingLocCount = 0;
 
   final PostoMode mode;
   final String? toyId;
@@ -52,6 +54,10 @@ class PostoSessionState extends Equatable {
   /// enquanto [CloseShiftView] (3c) está aberta, via
   /// `PostoSessionCubit.beginClosing`.
   final Map<PaymentMethod, double> closingExpectedByMethod;
+
+  /// Quantas locações entraram no cálculo de [closingExpectedByMethod] —
+  /// só populado junto com ele, via `PostoSessionCubit.beginClosing`.
+  final int closingLocCount;
 
   /// Draft do campo "quanto tem em dinheiro" de 3c (texto bruto, igual
   /// ao padrão de outros drafts de formulário no app — `NewRentalState`
@@ -80,6 +86,7 @@ class PostoSessionState extends Equatable {
     List<PostoSummary>? postos,
     Map<PaymentMethod, double>? closingExpectedByMethod,
     String? closingCountedCashInput,
+    int? closingLocCount,
   }) {
     return PostoSessionState(
       mode: mode ?? this.mode,
@@ -90,6 +97,7 @@ class PostoSessionState extends Equatable {
       postos: postos ?? this.postos,
       closingExpectedByMethod: closingExpectedByMethod ?? this.closingExpectedByMethod,
       closingCountedCashInput: closingCountedCashInput ?? this.closingCountedCashInput,
+      closingLocCount: closingLocCount ?? this.closingLocCount,
     );
   }
 
@@ -105,5 +113,6 @@ class PostoSessionState extends Equatable {
         postos,
         closingExpectedByMethod,
         closingCountedCashInput,
+        closingLocCount,
       ];
 }

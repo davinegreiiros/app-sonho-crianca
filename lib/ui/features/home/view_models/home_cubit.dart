@@ -64,6 +64,7 @@ class HomeCubit extends Cubit<HomeState> {
       doneTodayCount: doneToday.length,
       homeTotalToday: homeTotalToday,
       toys: toys,
+      now: DateTime.now(),
     );
   }
 
