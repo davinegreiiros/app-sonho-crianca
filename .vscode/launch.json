@@ -4,23 +4,45 @@
     // Para obter mais informações, acesse: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-        
         {
-            "name": "app-sonho-crianca",
-            "request": "launch",
-            "type": "dart"
-        },
-        {
-            "name": "app-sonho-crianca (profile mode)",
+            "name": "app-sonho-crianca (dev)",
             "request": "launch",
             "type": "dart",
-            "flutterMode": "profile"
+            "args": ["--flavor", "dev", "--dart-define-from-file", "secrets.json"]
         },
         {
-            "name": "app-sonho-crianca (release mode)",
+            "name": "app-sonho-crianca (dev, profile mode)",
             "request": "launch",
             "type": "dart",
-            "flutterMode": "release"
+            "flutterMode": "profile",
+            "args": ["--flavor", "dev", "--dart-define-from-file", "secrets.json"]
+        },
+        {
+            "name": "app-sonho-crianca (dev, release mode)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "release",
+            "args": ["--flavor", "dev", "--dart-define-from-file", "secrets.json"]
+        },
+        {
+            "name": "app-sonho-crianca (prod)",
+            "request": "launch",
+            "type": "dart",
+            "args": ["--flavor", "prod", "--dart-define-from-file", "secrets.json"]
+        },
+        {
+            "name": "app-sonho-crianca (prod, profile mode)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "profile",
+            "args": ["--flavor", "prod", "--dart-define-from-file", "secrets.json"]
+        },
+        {
+            "name": "app-sonho-crianca (prod, release mode)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "release",
+            "args": ["--flavor", "prod", "--dart-define-from-file", "secrets.json"]
         }
     ]
 }

@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../test_keys.dart';
 import '../../../../theme/app_colors.dart';
+import '../../../../widgets/auth_gate.dart';
 import '../../../../widgets/toy_icon.dart';
 import '../../../core/initials_avatar.dart';
 import '../view_models/posto_session_cubit.dart';
@@ -19,10 +20,14 @@ import '../view_models/posto_session_state.dart';
 /// administrador"). Monitores rotativos não têm Operator cadastrado;
 /// `Turno.monitorName`/`createdByMonitorName` continuam um rótulo local,
 /// nunca verificado. A sessão de operador real que o backend exige pra
-/// escrita (`Rental`) é obtida em outro ponto — na primeira ação de
-/// dinheiro (`ensureOperatorSession` em `new_rental_sheet_view.dart`/
-/// `modal_launchers.dart`), tipicamente só uma vez, pelo administrador,
-/// pro aparelho inteiro (sessão persiste em `flutter_secure_storage`).
+/// escrita (`Rental`) é pedida aqui mesmo, ao tocar "Entrar como
+/// administrador" (`_enterAdmin`) — é tarde demais esperar até a
+/// primeira locação, o operador já teria navegado fundo achando que
+/// estava "dentro". Mesma guarda (`ensureOperatorSession`) ainda cobre
+/// `new_rental_sheet_view.dart`/`modal_launchers.dart` como rede de
+/// segurança pro fluxo do posto (que nunca passa por aqui) — na prática
+/// só pede de verdade uma vez, a sessão persiste em
+/// `flutter_secure_storage` pro aparelho inteiro.
 class OpenPostoView extends StatefulWidget {
   const OpenPostoView({super.key});
 
@@ -63,6 +68,17 @@ class _OpenPostoViewState extends State<OpenPostoView> {
     context.read<PostoSessionCubit>().openOrResume(toyId, monitorName: _nameController.text);
     _nameController.clear();
     setState(() => _selectedFreeToyId = null);
+  }
+
+  /// Pede a sessão de operador real já aqui — não só na primeira ação de
+  /// dinheiro. Modo administrador é por definição quem mexe em
+  /// Configurações/Catálogo/Relatório; esperar até a primeira locação pra
+  /// pedir login era tarde demais (o operador já tinha navegado fundo no
+  /// painel achando que estava "dentro").
+  Future<void> _enterAdmin() async {
+    if (!await ensureOperatorSession(context)) return;
+    if (!mounted) return;
+    context.read<PostoSessionCubit>().enterAdmin();
   }
 
   @override
@@ -153,7 +169,7 @@ class _OpenPostoViewState extends State<OpenPostoView> {
             const SizedBox(height: 14),
             OutlinedButton.icon(
               key: TestKeys.enterAdminButton,
-              onPressed: () => context.read<PostoSessionCubit>().enterAdmin(),
+              onPressed: _enterAdmin,
               icon: const Icon(Icons.business_center_outlined, size: 17),
               label: const Text('Entrar como administrador'),
               style: OutlinedButton.styleFrom(

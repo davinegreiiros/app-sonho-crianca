@@ -11,7 +11,7 @@
          falharia toda chamada como "sem conexão". -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <application
-        android:label="sonho_de_crianca"
+        android:label="@string/app_name"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
