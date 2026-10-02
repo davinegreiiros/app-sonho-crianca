@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../test_keys.dart';
 import '../theme/app_colors.dart';
 import '../ui/features/app_shell/view_models/app_shell_cubit.dart';
+import '../ui/features/posto/view_models/posto_session_cubit.dart';
 import 'animations/bounce.dart';
 import 'animations/print_strip.dart';
 import 'modal_launchers.dart';
@@ -83,6 +84,8 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
                   child: Icon(Icons.settings_outlined, size: 18, color: AppColors.text.withValues(alpha: 0.6)),
                 ),
               ),
+              const SizedBox(width: 2),
+              const _AdminMenu(),
             ],
           ),
           const SizedBox(height: 10),
@@ -112,6 +115,59 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+enum _AdminMenuAction { backToPostos, logout }
+
+/// Saídas do modo administrador (spec 027-login-admin-sessao): voltar pros
+/// postos mantendo a sessão (o posto segue registrando locação com ela)
+/// ou sair da conta (logout).
+class _AdminMenu extends StatelessWidget {
+  const _AdminMenu();
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<_AdminMenuAction>(
+      key: TestKeys.adminMenuButton,
+      tooltip: 'Conta',
+      padding: EdgeInsets.zero,
+      color: AppColors.bg,
+      icon: Icon(Icons.account_circle_outlined, size: 18, color: AppColors.text.withValues(alpha: 0.6)),
+      style: IconButton.styleFrom(minimumSize: const Size(26, 26), padding: const EdgeInsets.all(4)),
+      onSelected: (action) {
+        switch (action) {
+          case _AdminMenuAction.backToPostos:
+            context.read<PostoSessionCubit>().exitToSelection();
+          case _AdminMenuAction.logout:
+            confirmAdminLogout(context);
+        }
+      },
+      itemBuilder: (context) => const [
+        PopupMenuItem(
+          key: TestKeys.adminBackToPostosItem,
+          value: _AdminMenuAction.backToPostos,
+          child: Row(
+            children: [
+              Icon(Icons.storefront_outlined, size: 18, color: AppColors.text),
+              SizedBox(width: 10),
+              Flexible(child: Text('Voltar para os postos', overflow: TextOverflow.ellipsis)),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          key: TestKeys.adminLogoutItem,
+          value: _AdminMenuAction.logout,
+          child: Row(
+            children: [
+              Icon(Icons.logout_rounded, size: 18, color: AppColors.accent2_700),
+              SizedBox(width: 10),
+              Flexible(child: Text('Sair da conta', overflow: TextOverflow.ellipsis, style: TextStyle(color: AppColors.accent2_700))),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

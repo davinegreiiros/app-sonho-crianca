@@ -1,5 +1,6 @@
-// Tests for spec 025-catalogo-sessao-dispositivo: leitura do catálogo usa
-// a sessão de dispositivo (sem exigir operador logado — cenário 1),
+// Tests for spec 025-catalogo-sessao-dispositivo (sessão revista na
+// 027-login-admin-sessao): leitura do catálogo usa a sessão do
+// administrador, sem sessão não chama nada, 401 derruba a sessão,
 // escrita exige sessão real (cenário 3), falha de dispositivo mantém o
 // cache sem avisar ninguém (cenário 4), 409 do backend chega com a
 // mensagem pronta (cenário 5), e dois `ToyRepository` enxergam a mesma
@@ -21,10 +22,9 @@ import 'package:sonho_de_crianca/domain/models/operator.dart';
 import 'package:sonho_de_crianca/domain/models/toy.dart';
 import 'package:sonho_de_crianca/theme/app_colors.dart';
 
-import 'fakes/fake_secure_storage.dart';
+import 'fakes/fake_session_storage.dart';
 
 const _humanOperator = Operator(id: 'op1', name: 'Maria', username: 'maria');
-const _deviceToken = 'fake-device-token';
 const _operatorToken = 'fake-operator-token';
 
 final _seedToy = Toy(
@@ -49,10 +49,10 @@ Map<String, dynamic> _toyJson(Toy t) => {
       'category': t.category.name,
     };
 
-/// Backend fake que *checa* o token: só aceita [_deviceToken] em `GET`
-/// (leitura, cenário 1) e só aceita [_operatorToken] em `POST`/`PATCH`/
-/// `DELETE` (escrita, cenário 3) — qualquer outro token (ou nenhum) vira
-/// 401, igual o backend real faria pra uma sessão errada/ausente.
+/// Backend fake que *checa* o token: só aceita [_operatorToken] (sessão
+/// do administrador, spec 027) em leitura e escrita — qualquer outro token
+/// (ou nenhum) vira 401, igual o backend real faria pra uma sessão
+/// errada/ausente.
 /// `http.Response` com `content-type: application/json` — sem isso, a
 /// codificação cai no default (`latin1`), que rejeita caracteres como "—"
 /// nas mensagens de erro em português (`http.Response` decide a
@@ -67,7 +67,7 @@ http.Client _authAwareBackend({List<Toy>? initial, Set<String> blockedIds = cons
     final path = request.url.path;
 
     if (request.method == 'GET' && path == '/api/toys') {
-      if (auth != 'Bearer $_deviceToken') {
+      if (auth != 'Bearer $_operatorToken') {
         return _jsonResponse({'error': 'Token inválido ou expirado'}, 401);
       }
       return _jsonResponse(toys.map(_toyJson).toList(), 200);
@@ -133,48 +133,70 @@ ToyRepository _repository(http.Client client, {bool operatorLoggedIn = false}) {
   );
 }
 
+/// Sessão do administrador — a única que existe desde a spec
+/// 027-login-admin-sessao (leitura e escrita usam o mesmo token).
+AuthRepository _adminAuth({String token = _operatorToken}) => AuthRepository.withSession(token: token, operator: _humanOperator);
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  setUp(setUpFakeSecureStorage);
+  setUp(setUpFakeSessionStorage);
 
-  group('load() — sessão de dispositivo (cenário 1)', () {
-    test('lê o catálogo sem sessão de operador real', () async {
-      final deviceAuth = _FakeDeviceAuth(deviceToken: _deviceToken);
+  group('load() — sessão do administrador (spec 027)', () {
+    test('lê o catálogo com o token do administrador', () async {
       final repository = ToyRepository(
         service: ToyRemoteService(ApiClient(httpClient: _authAwareBackend())),
-        authRepository: deviceAuth,
+        authRepository: _adminAuth(),
       );
 
       await repository.load();
 
       expect(repository.toys, hasLength(1));
       expect(repository.toys.first.name, 'Carrinho');
-      // A sessão de operador real nunca entrou em jogo.
-      expect(deviceAuth.isLoggedIn, isFalse);
     });
-  });
 
-  group('load() — falha de dispositivo (cenário 4)', () {
-    test('sem deviceToken configurado, mantém o catálogo seed sem erro', () async {
-      final repository = _repository(_authAwareBackend());
+    test('sem sessão, não chama o backend e mantém o catálogo seed', () async {
+      var calls = 0;
+      final repository = ToyRepository(
+        service: ToyRemoteService(ApiClient(httpClient: MockClient((_) async {
+          calls++;
+          return http.Response('[]', 200);
+        }))),
+        authRepository: AuthRepository(),
+      );
       final before = repository.toys;
 
       await repository.load();
 
-      expect(repository.toys, before); // nada mudou, nenhuma exceção subiu
+      expect(calls, 0);
+      expect(repository.toys, before);
     });
 
-    test('backend fora do ar mantém o catálogo em cache', () async {
-      final authWithDevice = _FakeDeviceAuth(deviceToken: _deviceToken);
+    test('401 na leitura mantém o cache e derruba a sessão (cenário 8)', () async {
+      final auth = _adminAuth(token: 'token-revogado');
       final repository = ToyRepository(
-        service: ToyRemoteService(ApiClient(httpClient: MockClient((_) async => throw http.ClientException('sem rede (fake)')))),
-        authRepository: authWithDevice,
+        service: ToyRemoteService(ApiClient(httpClient: _authAwareBackend())),
+        authRepository: auth,
       );
       final before = repository.toys;
 
       await repository.load();
 
       expect(repository.toys, before);
+      expect(auth.isLoggedIn, isFalse);
+    });
+
+    test('backend fora do ar mantém o catálogo em cache e a sessão', () async {
+      final auth = _adminAuth();
+      final repository = ToyRepository(
+        service: ToyRemoteService(ApiClient(httpClient: MockClient((_) async => throw http.ClientException('sem rede (fake)')))),
+        authRepository: auth,
+      );
+      final before = repository.toys;
+
+      await repository.load();
+
+      expect(repository.toys, before);
+      expect(auth.isLoggedIn, isTrue);
     });
   });
 
@@ -250,7 +272,7 @@ void main() {
       );
       final repoB = ToyRepository(
         service: ToyRemoteService(ApiClient(httpClient: client)),
-        authRepository: _FakeDeviceAuth(deviceToken: _deviceToken),
+        authRepository: _adminAuth(),
       );
 
       await repoA.addNew(
@@ -266,17 +288,4 @@ void main() {
       expect(repoB.toys.any((t) => t.name == 'Compartilhado'), isTrue);
     });
   });
-}
-
-/// `AuthRepository` de teste com `deviceToken` pronto, sem tocar
-/// storage/rede — `AuthRepository` real só preenche `deviceToken` via
-/// `loginDevice()` (que bate numa rota de login, não é o que estes testes
-/// de leitura querem simular).
-class _FakeDeviceAuth extends AuthRepository {
-  _FakeDeviceAuth({required String deviceToken}) : _fakeDeviceToken = deviceToken;
-
-  final String _fakeDeviceToken;
-
-  @override
-  String? get deviceToken => _fakeDeviceToken;
 }

@@ -17,7 +17,7 @@ void showRentalActionError(BuildContext context, Object error) {
       SnackBar(
         content: const Text('Faça login para continuar.'),
         duration: const Duration(seconds: 4),
-        action: SnackBarAction(label: 'Entrar', onPressed: () => ensureOperatorSession(context)),
+        action: SnackBarAction(label: 'Entrar', onPressed: loginActionFor(context)),
       ),
     );
     return;

@@ -47,7 +47,7 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
-# Segredos de build (spec 025-catalogo-sessao-dispositivo) — credencial da
-# sessão de dispositivo, fornecida via --dart-define-from-file=secrets.json.
-# Nunca commitado; ver secrets.example.json pras chaves esperadas.
+# Antigo arquivo de segredos da sessão de dispositivo (spec 025, removida
+# na 027-login-admin-sessao). Continua ignorado pra cópia local que tenha
+# sobrado nunca ir pro git.
 /secrets.json

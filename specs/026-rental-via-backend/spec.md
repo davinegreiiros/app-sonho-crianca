@@ -15,6 +15,8 @@ O backend exige operador real autenticado (`requireOperator`) em **toda** rota d
 
 ## Decisão — login fica só com o administrador (revisada após a 1ª implementação)
 
+> **Revisado pela [027-login-admin-sessao](../027-login-admin-sessao/spec.md)**: a sessão de dispositivo some (leitura também usa a sessão do administrador), a sessão passa pra `SharedPreferences`, "Entrar como administrador" sempre pede login e o admin ganha logout. O resto desta decisão (monitor sem conta, nome livre) continua valendo.
+
 **Esta seção documenta a decisão final** — a primeira versão implementada desta spec trocou "Quem é você hoje" por login real *por turno* (todo monitor logando); revisado antes do merge por confundir duas coisas diferentes: quem tem conta de verdade no backend (auditoria) vs. quem está fisicamente no posto hoje (rótulo local, rotativo). Ver "Correção" mais abaixo pro porquê.
 
 "Quem é você hoje" **continua nome livre, sem conta** — exatamente como na `023`. A sessão de operador real que o backend exige pra escrita de `Rental` é uma camada **separada**, desacoplada do fluxo do posto:

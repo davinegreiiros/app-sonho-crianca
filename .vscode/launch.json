@@ -7,22 +7,19 @@
         {
             "name": "app-sonho-crianca",
             "request": "launch",
-            "type": "dart",
-            "args": ["--dart-define-from-file", "secrets.json"]
+            "type": "dart"
         },
         {
             "name": "app-sonho-crianca (profile mode)",
             "request": "launch",
             "type": "dart",
-            "flutterMode": "profile",
-            "args": ["--dart-define-from-file", "secrets.json"]
+            "flutterMode": "profile"
         },
         {
             "name": "app-sonho-crianca (release mode)",
             "request": "launch",
             "type": "dart",
-            "flutterMode": "release",
-            "args": ["--dart-define-from-file", "secrets.json"]
+            "flutterMode": "release"
         }
     ]
 }
