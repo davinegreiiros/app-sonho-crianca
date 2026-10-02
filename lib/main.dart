@@ -62,13 +62,21 @@ Future<void> main() async {
     authRepository.restoreSession(),
     turnoRepository.load(),
   ]);
-  // Sessão de dispositivo + catálogo + locações em segundo plano (specs
-  // 025/026): são chamadas de rede, não podem travar o boot do jeito que
-  // o SQLite local de antes não travava (cenário 4/5 — sem internet, não
-  // pode travar nem ficar em branco). O app nasce com o catálogo/histórico
+  // Catálogo + locações em segundo plano (specs 025/026): são chamadas de
+  // rede, não podem travar o boot (cenário 4/5 — sem internet, não pode
+  // travar nem ficar em branco). O app nasce com o catálogo/histórico
   // seed/último bom e atualiza sozinho (`ChangeNotifier`) assim que
-  // `load()` resolver — `PostoSessionCubit` já escuta essa mudança.
-  unawaited(authRepository.loginDevice().then((_) => Future.wait([toyRepository.load(), rentalRepository.load()])));
+  // `load()` resolver. Uma sessão só, a do administrador (spec 027): sem
+  // ela os `load()` não chamam nada, e cada login novo dispara a busca de
+  // novo — o administrador que acabou de entrar já vê o dado do servidor.
+  void loadRemoteData() => unawaited(Future.wait([toyRepository.load(), rentalRepository.load()]));
+  var lastToken = authRepository.token;
+  authRepository.addListener(() {
+    final token = authRepository.token;
+    if (token != null && token != lastToken) loadRemoteData();
+    lastToken = token;
+  });
+  loadRemoteData();
 
   runApp(SonhoDeCriancaApp(
     authRepository: authRepository,

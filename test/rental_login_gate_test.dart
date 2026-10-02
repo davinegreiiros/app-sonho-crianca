@@ -1,8 +1,9 @@
-// Widget test for spec 026-rental-via-backend, cenário 7: em modo
-// administrador (sem ter passado pelo posto, onde o login já aconteceu ao
-// abrir o turno), criar uma locação sem sessão de operador real leva ao
-// login antes — mesma guarda que Configurações/Catálogo já usam
-// (`ensureOperatorSession`), aqui aplicada à escrita de `Rental`.
+// Widget test for spec 026-rental-via-backend, cenário 7: sem sessão do
+// administrador (aparelho novo, "Sair da conta" ou token vencido — spec
+// 027), criar uma locação leva ao login antes — mesma guarda que
+// Configurações/Catálogo já usam (`ensureOperatorSession`). Entrada no
+// modo administrador também pede login (cenário 1 da 027 — mais casos em
+// `admin_session_test.dart`).
 
 import 'package:flutter_test/flutter_test.dart';
 
@@ -13,11 +14,11 @@ import 'package:sonho_de_crianca/main.dart';
 import 'package:sonho_de_crianca/test_keys.dart';
 
 import 'fakes/fake_rental_backend.dart';
-import 'fakes/fake_secure_storage.dart';
+import 'fakes/fake_session_storage.dart';
 import 'fakes/fake_toy_backend.dart';
 
 void main() {
-  setUp(setUpFakeSecureStorage);
+  setUp(setUpFakeSessionStorage);
 
   testWidgets('"Entrar como administrador" sem sessão real leva ao login antes de entrar', (tester) async {
     final authRepository = AuthRepository(); // sem sessão nenhuma

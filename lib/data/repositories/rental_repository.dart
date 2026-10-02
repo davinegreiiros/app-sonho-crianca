@@ -10,12 +10,9 @@ import 'auth_repository.dart';
 /// partir da 026-rental-via-backend) — one shared instance (wired in
 /// `main.dart`).
 ///
-/// Duas sessões diferentes (mesma decisão da 025 pra `Toy`, ver
-/// `specs/026-rental-via-backend/spec.md` — "Decisão: login real por
-/// turno"): [load] (leitura, todo mundo, inclusive o posto) usa
-/// `AuthRepository.deviceToken`; as mutações ([addNew]/[extend]/[cancel]/
-/// [finish]) usam `AuthRepository.token` — a sessão de operador real,
-/// obtida uma vez ao abrir o posto (ou sob demanda em modo administrador).
+/// Uma sessão só (spec 027-login-admin-sessao): leitura ([load]) e
+/// mutações ([addNew]/[extend]/[cancel]/[finish]) usam
+/// `AuthRepository.token`, a sessão do administrador salva no aparelho.
 ///
 /// [rentals] continua a mesma lista mutável de sempre (não
 /// `List.unmodifiable`) — vários Cubits e alguns testes (ex.
@@ -81,24 +78,34 @@ class RentalRepository extends ChangeNotifier {
     ];
   }
 
-  /// Busca o histórico no backend com a sessão de dispositivo (todas as
+  /// Busca o histórico no backend com a sessão do administrador (todas as
   /// páginas do cursor, ver `RentalRemoteService.loadAll`). Nunca propaga
-  /// erro: sem rede, sem `deviceToken` configurado, ou 401 deixam
-  /// [rentals] como estava (seed/último fetch bom) — mesma régua da 025
-  /// pro catálogo (cenário 5: fluxo principal do dia a dia não pode
-  /// travar por conectividade). Sem retry de relogin aqui: `main.dart` já
-  /// encadeia `loginDevice()` antes de chamar isto.
+  /// erro: sem sessão (não chama nada), sem rede ou 401 deixam [rentals]
+  /// como estava (seed/último fetch bom) — mesma régua da 025 pro
+  /// catálogo (cenário 5: fluxo principal do dia a dia não pode travar
+  /// por conectividade). 401 ainda derruba a sessão (spec 027, cenário 8).
   Future<void> load() async {
+    final token = _authRepository.token;
+    if (token == null) return;
     try {
-      final loaded = await _service.loadAll(token: _authRepository.deviceToken);
+      final loaded = await _service.loadAll(token: token);
       if (_disposed) return;
       rentals
         ..clear()
         ..addAll(loaded);
       notifyListeners();
+    } on ApiUnauthorizedException {
+      if (!_disposed) await _authRepository.logout();
     } catch (e) {
-      debugPrint('RentalRepository: falha ao carregar locações: $e');
+      debugPrint('RentalRepository: falha ao carregar locações: ${e.runtimeType}');
     }
+  }
+
+  /// 401 numa escrita = token vencido/revogado no servidor: derruba a
+  /// sessão local pra próxima ação pedir login (spec 027, cenário 8) em
+  /// vez de repetir o mesmo token morto.
+  Future<void> _dropSessionIfUnauthorized(Object error) async {
+    if (error is ApiUnauthorizedException && !_disposed) await _authRepository.logout();
   }
 
   String _requireOperatorToken() {
@@ -128,17 +135,23 @@ class RentalRepository extends ChangeNotifier {
     String? createdByMonitorName,
   }) async {
     final token = _requireOperatorToken();
-    final rental = await _service.create(
-      toyId: toyId,
-      childName: childName,
-      guardianName: guardianName,
-      guardianPhone: guardianPhone,
-      startedAt: DateTime.now(),
-      durationMin: durationMin,
-      ratePerMinute: ratePerMinute,
-      price: price,
-      token: token,
-    );
+    final Rental rental;
+    try {
+      rental = await _service.create(
+        toyId: toyId,
+        childName: childName,
+        guardianName: guardianName,
+        guardianPhone: guardianPhone,
+        startedAt: DateTime.now(),
+        durationMin: durationMin,
+        ratePerMinute: ratePerMinute,
+        price: price,
+        token: token,
+      );
+    } catch (e) {
+      await _dropSessionIfUnauthorized(e);
+      rethrow;
+    }
     rental.createdByMonitorName = createdByMonitorName;
     if (!_disposed) {
       rentals.add(rental);
@@ -170,6 +183,7 @@ class RentalRepository extends ChangeNotifier {
         r.price = previousPrice;
         notifyListeners();
       }
+      await _dropSessionIfUnauthorized(e);
       rethrow;
     }
   }
@@ -196,6 +210,7 @@ class RentalRepository extends ChangeNotifier {
         r.endedAt = previousEndedAt;
         notifyListeners();
       }
+      await _dropSessionIfUnauthorized(e);
       rethrow;
     }
   }
@@ -218,7 +233,7 @@ class RentalRepository extends ChangeNotifier {
     r.finish(method, finishedByMonitorName: finishedByMonitorName);
     notifyListeners();
     try {
-      await _service.finish(rentalId, method, token: token);
+      await _service.finish(rentalId, method, finalPrice: finalPrice, token: token);
     } catch (e) {
       if (!_disposed) {
         r.status = previousStatus;
@@ -228,6 +243,7 @@ class RentalRepository extends ChangeNotifier {
         r.finishedByMonitorName = previousFinishedBy;
         notifyListeners();
       }
+      await _dropSessionIfUnauthorized(e);
       rethrow;
     }
   }

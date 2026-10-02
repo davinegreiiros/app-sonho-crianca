@@ -3,9 +3,8 @@ import 'api_client.dart';
 
 /// Sucessor de `RentalLocalService` (spec 026-rental-via-backend) — por
 /// baixo chama o backend em vez de SQLite. `token` vem de `AuthRepository`
-/// a cada chamada (stateless, mesma regra de `ToyRemoteService`): leitura
-/// usa o token de dispositivo, escrita usa o de operador real — quem
-/// decide qual é o `RentalRepository`, não este Service.
+/// a cada chamada (stateless, mesma regra de `ToyRemoteService`) — sempre
+/// a sessão do administrador (spec 027-login-admin-sessao).
 ///
 /// `createdByOperatorId`/`finishedByOperatorId` do backend (auditoria por
 /// id) não têm campo equivalente aqui — `Rental.createdByMonitorName`/
@@ -78,11 +77,18 @@ class RentalRemoteService {
     return _fromJson(json);
   }
 
-  Future<Rental> finish(String id, PaymentMethod paymentMethod, {required String? token}) async {
+  /// [finalPrice]: valor final de locação de tempo corrido (nasce com
+  /// `price: 0` no backend) — sem ele o backend gravaria R$ 0 e o turno/
+  /// painel do servidor perderiam esse valor (backend#003, bugfix
+  /// 2026-10-02). Nunca mandar pra duração fixa (backend responde 400).
+  Future<Rental> finish(String id, PaymentMethod paymentMethod, {double? finalPrice, required String? token}) async {
     final json = await _apiClient.patch(
       '/api/rentals/$id/finish',
       token: token,
-      body: {'paymentMethod': paymentMethod.name},
+      body: {
+        'paymentMethod': paymentMethod.name,
+        if (finalPrice != null) 'finalPrice': finalPrice,
+      },
     ) as Map<String, dynamic>;
     return _fromJson(json);
   }

@@ -19,15 +19,13 @@ import '../view_models/posto_session_state.dart';
 /// revisada — ver `spec.md`, "Correção — login fica só com o
 /// administrador"). Monitores rotativos não têm Operator cadastrado;
 /// `Turno.monitorName`/`createdByMonitorName` continuam um rótulo local,
-/// nunca verificado. A sessão de operador real que o backend exige pra
-/// escrita (`Rental`) é pedida aqui mesmo, ao tocar "Entrar como
-/// administrador" (`_enterAdmin`) — é tarde demais esperar até a
-/// primeira locação, o operador já teria navegado fundo achando que
-/// estava "dentro". Mesma guarda (`ensureOperatorSession`) ainda cobre
-/// `new_rental_sheet_view.dart`/`modal_launchers.dart` como rede de
-/// segurança pro fluxo do posto (que nunca passa por aqui) — na prática
-/// só pede de verdade uma vez, a sessão persiste em
-/// `flutter_secure_storage` pro aparelho inteiro.
+/// nunca verificado. A sessão do administrador que o backend exige é
+/// checada aqui, ao tocar "Entrar como administrador" (`_enterAdmin`, spec
+/// 027-login-admin-sessao): sem sessão válida (aparelho novo, "Sair da
+/// conta", token vencido) pede login; com sessão válida entra direto —
+/// voltar pros postos e entrar de novo não obriga relogar. A mesma sessão
+/// é usada pelo posto pra registrar locação (guarda `ensureOperatorSession`
+/// em `new_rental_sheet_view.dart`/`modal_launchers.dart`).
 class OpenPostoView extends StatefulWidget {
   const OpenPostoView({super.key});
 
@@ -70,11 +68,10 @@ class _OpenPostoViewState extends State<OpenPostoView> {
     setState(() => _selectedFreeToyId = null);
   }
 
-  /// Pede a sessão de operador real já aqui — não só na primeira ação de
-  /// dinheiro. Modo administrador é por definição quem mexe em
-  /// Configurações/Catálogo/Relatório; esperar até a primeira locação pra
-  /// pedir login era tarde demais (o operador já tinha navegado fundo no
-  /// painel achando que estava "dentro").
+  /// Pede login só sem sessão válida (spec 027, cenário 1). O "login
+  /// recente" (até 15 min) que o backend exige pra fechar turno
+  /// (backend#003) não é checado aqui — quando o app consumir essa rota,
+  /// o 403 dela é que deve pedir login de novo.
   Future<void> _enterAdmin() async {
     if (!await ensureOperatorSession(context)) return;
     if (!mounted) return;

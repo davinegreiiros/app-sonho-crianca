@@ -60,6 +60,12 @@ class TestKeys {
   static const adminPanelButton = ValueKey('admin_panel_button');
   static const adminPanelBackButton = ValueKey('admin_panel_back_button');
 
+  // Menu do administrador (spec 027-login-admin-sessao)
+  static const adminMenuButton = ValueKey('admin_menu_button');
+  static const adminBackToPostosItem = ValueKey('admin_back_to_postos_item');
+  static const adminLogoutItem = ValueKey('admin_logout_item');
+  static const adminLogoutConfirmButton = ValueKey('admin_logout_confirm_button');
+
   // Login de operador (spec 024-sync-backend-fundacao)
   static const loginUsernameField = ValueKey('login_username_field');
   static const loginPasswordField = ValueKey('login_password_field');

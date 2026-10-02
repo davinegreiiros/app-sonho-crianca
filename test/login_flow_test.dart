@@ -17,7 +17,7 @@ import 'package:sonho_de_crianca/test_keys.dart';
 
 import 'fakes/fake_auth_backend.dart';
 import 'fakes/fake_business_settings.dart';
-import 'fakes/fake_secure_storage.dart';
+import 'fakes/fake_session_storage.dart';
 
 const _maria = Operator(id: 'op1', name: 'Maria Souza', username: 'maria');
 
@@ -41,7 +41,7 @@ Future<void> _settleFrames(WidgetTester tester, {int frames = 8}) async {
 }
 
 void main() {
-  setUp(setUpFakeSecureStorage);
+  setUp(setUpFakeSessionStorage);
 
   testWidgets('sem sessão: gear icon abre login, não Configurações', (tester) async {
     await _pumpLoggedOutApp(tester);

@@ -28,7 +28,7 @@ import 'package:sonho_de_crianca/ui/features/posto/view_models/posto_session_sta
 import 'fakes/fake_auth_backend.dart';
 import 'fakes/fake_business_settings.dart' show fakeLoggedInAuthRepository;
 import 'fakes/fake_rental_backend.dart';
-import 'fakes/fake_secure_storage.dart';
+import 'fakes/fake_session_storage.dart';
 import 'fakes/fake_toy_backend.dart';
 
 const _gustavo = Operator(id: 'op-gustavo', name: 'Gustavo', username: 'gustavo');
@@ -47,7 +47,7 @@ Future<void> _settle(WidgetTester tester, {int frames = 8}) async {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   SharedPreferences.setMockInitialValues({});
-  setUp(setUpFakeSecureStorage);
+  setUp(setUpFakeSessionStorage);
 
   testWidgets('abrir um posto livre pede só o nome (sem conta) e trava o brinquedo em 3b', (tester) async {
     final turnoRepository = TurnoRepository();
@@ -454,7 +454,8 @@ void main() {
     expect(find.text('LIVRE'), findsWidgets); // de volta pra 3a, posto livre de novo
     expect(turnoRepository.turnos.single.isOpen, isFalse);
 
-    // Entra como administrador e confere que o turno/locação aparecem lá.
+    // Entra como administrador (sessão válida, não pede login — spec 027)
+    // e confere que o turno/locação aparecem lá.
     await tester.tap(find.byKey(TestKeys.enterAdminButton));
     await _settle(tester);
     await tester.tap(find.byKey(TestKeys.adminPanelButton));

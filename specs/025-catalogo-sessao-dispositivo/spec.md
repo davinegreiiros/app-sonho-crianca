@@ -3,6 +3,8 @@
 Status: Implemented
 Criado: 2026-10-01
 
+> **Sessão de dispositivo removida pela [027-login-admin-sessao](../027-login-admin-sessao/spec.md)** — leitura passa a usar a sessão do administrador; `secrets.json`/`DEVICE_OPERATOR_*` não existem mais.
+
 Segunda fatia da árvore aberta pela [022-backend-sync-fundacao](../022-backend-sync-fundacao/spec.md) — depois da [024-sync-backend-fundacao](../024-sync-backend-fundacao/spec.md) (login de operador + `BusinessSettings`). Resolve uma colisão de arquitetura achada ao planejar esta fatia (ver "Decisão — sessão de dispositivo" abaixo) antes de migrar `Toy`.
 
 ## Problema

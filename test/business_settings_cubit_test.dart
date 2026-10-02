@@ -24,7 +24,7 @@ import 'package:sonho_de_crianca/ui/features/business_settings/view_models/busin
 import 'package:sonho_de_crianca/ui/features/business_settings/view_models/business_settings_state.dart';
 
 import 'fakes/fake_rental_notifier.dart';
-import 'fakes/fake_secure_storage.dart';
+import 'fakes/fake_session_storage.dart';
 
 const _testOperator = Operator(id: 'op1', name: 'Maria', username: 'maria');
 
@@ -69,7 +69,7 @@ http.Client _fakeUnreachableBackend() => MockClient((request) async => throw htt
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  setUp(setUpFakeSecureStorage);
+  setUp(setUpFakeSessionStorage);
 
   group('BusinessSettingsRepository', () {
     test('starts with empty defaults and load() hydrates from the backend', () async {

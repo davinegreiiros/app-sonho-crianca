@@ -1,7 +1,7 @@
 // Tests for spec 013 (fundação, `withDemoSeed`/notify-on-mutation) +
-// spec 026-rental-via-backend (sincronização com o backend): leitura usa
-// a sessão de dispositivo (cenário 1, sem exigir operador real), escrita
-// exige sessão real (cenário 3), falha de leitura mantém o cache sem
+// spec 026-rental-via-backend (sincronização com o backend) + 027
+// (sessão única do administrador): leitura e escrita usam o token do
+// administrador, 401 derruba a sessão, falha de leitura mantém o cache sem
 // avisar ninguém (cenário 5), 409 de concorrência chega com reversão
 // (cenário 6), e dois `RentalRepository` enxergam a mesma mudança através
 // do mesmo backend fake (cenário 2). `ApiClient` roda contra `MockClient`
@@ -25,10 +25,9 @@ import 'package:sonho_de_crianca/state/app_state.dart';
 
 import 'fakes/fake_rental_backend.dart';
 import 'fakes/fake_rental_notifier.dart';
-import 'fakes/fake_secure_storage.dart';
+import 'fakes/fake_session_storage.dart';
 
 const _humanOperator = Operator(id: 'op1', name: 'Maria', username: 'maria');
-const _deviceToken = 'fake-device-token';
 const _operatorToken = 'fake-operator-token';
 
 http.Response _jsonResponse(Object body, int status) =>
@@ -49,10 +48,9 @@ Map<String, dynamic> _toJson(Rental r) => {
       'paymentMethod': r.paymentMethod?.name,
     };
 
-/// Backend fake que *checa* o token: só aceita [_deviceToken] em `GET`
-/// (leitura, cenário 1) e só aceita [_operatorToken] em `POST`/`PATCH`
-/// (escrita, cenário 3) — qualquer outro token (ou nenhum) vira 401,
-/// mesmo contrato do backend real. Mesma técnica de `toy_repository_test
+/// Backend fake que *checa* o token: só aceita [_operatorToken] (sessão
+/// do administrador, spec 027) em leitura e escrita — qualquer outro token
+/// (ou nenhum) vira 401, mesmo contrato do backend real. Mesma técnica de `toy_repository_test
 /// .dart` (spec 025): reimplementa as rotas (não envolve
 /// `fakeRentalBackend`, que não checa token nenhum).
 http.Client _authAwareBackend({List<Rental>? initial, Set<String> blockedToyIds = const {}}) {
@@ -63,7 +61,7 @@ http.Client _authAwareBackend({List<Rental>? initial, Set<String> blockedToyIds 
     final path = request.url.path;
 
     if (request.method == 'GET' && path == '/api/rentals') {
-      if (auth != 'Bearer $_deviceToken') {
+      if (auth != 'Bearer $_operatorToken') {
         return _jsonResponse({'error': 'Token inválido ou expirado'}, 401);
       }
       return _jsonResponse({'items': rentals.map(_toJson).toList(), 'nextCursor': null}, 200);
@@ -131,10 +129,14 @@ RentalRepository _repository(http.Client client, {bool operatorLoggedIn = false}
   return RentalRepository(service: RentalRemoteService(ApiClient(httpClient: client)), authRepository: authRepository);
 }
 
+/// Sessão do administrador — a única que existe desde a spec
+/// 027-login-admin-sessao (leitura e escrita usam o mesmo token).
+AuthRepository _adminAuth({String token = _operatorToken}) => AuthRepository.withSession(token: token, operator: _humanOperator);
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   SharedPreferences.setMockInitialValues({});
-  setUp(setUpFakeSecureStorage);
+  setUp(setUpFakeSessionStorage);
 
   group('withDemoSeed()', () {
     test('seeds the same 11 rentals AppState used to (3 active, 8 done)', () {
@@ -150,43 +152,78 @@ void main() {
     });
   });
 
-  group('load() — sessão de dispositivo (cenário 1)', () {
-    test('lê o histórico sem sessão de operador real', () async {
+  group('load() — sessão do administrador (spec 027)', () {
+    test('lê o histórico com o token do administrador', () async {
       final seedRental = Rental(id: 'seed-1', toyId: 'carrinho', childName: 'A', guardianName: 'B', startedAt: DateTime.now(), durationMin: 15, price: 10, status: RentalStatus.active);
-      final authRepository = _FakeDeviceAuth(deviceToken: _deviceToken);
       final repository = RentalRepository(
         service: RentalRemoteService(ApiClient(httpClient: _authAwareBackend(initial: [seedRental]))),
-        authRepository: authRepository,
+        authRepository: _adminAuth(),
       );
 
       await repository.load();
 
       expect(repository.rentals, hasLength(1));
-      expect(authRepository.isLoggedIn, isFalse);
     });
   });
 
   group('load() — falha (cenário 5)', () {
-    test('sem deviceToken configurado, mantém o histórico seed sem erro', () async {
-      final repository = _repository(_authAwareBackend());
+    test('sem sessão, não chama o backend e mantém o histórico', () async {
+      var calls = 0;
+      final repository = RentalRepository(
+        service: RentalRemoteService(ApiClient(httpClient: MockClient((_) async {
+          calls++;
+          return http.Response('{"items":[],"nextCursor":null}', 200);
+        }))),
+        authRepository: AuthRepository(),
+      );
       final before = repository.rentals;
 
       await repository.load();
 
+      expect(calls, 0);
       expect(repository.rentals, before);
     });
 
+    test('401 na leitura mantém o histórico e derruba a sessão (spec 027, cenário 8)', () async {
+      final auth = _adminAuth(token: 'token-revogado');
+      final repository = RentalRepository(
+        service: RentalRemoteService(ApiClient(httpClient: _authAwareBackend())),
+        authRepository: auth,
+      );
+
+      await repository.load();
+
+      expect(repository.rentals, isEmpty);
+      expect(auth.isLoggedIn, isFalse);
+    });
+
     test('backend fora do ar mantém o histórico em cache', () async {
-      final authWithDevice = _FakeDeviceAuth(deviceToken: _deviceToken);
       final repository = RentalRepository(
         service: RentalRemoteService(ApiClient(httpClient: MockClient((_) async => throw http.ClientException('sem rede (fake)')))),
-        authRepository: authWithDevice,
+        authRepository: _adminAuth(),
       );
       final before = repository.rentals;
 
       await repository.load();
 
       expect(repository.rentals, before);
+    });
+  });
+
+  group('escrita com sessão revogada (spec 027, cenário 8)', () {
+    test('401 no addNew derruba a sessão e propaga o erro', () async {
+      final auth = _adminAuth(token: 'token-revogado');
+      final repository = RentalRepository(
+        service: RentalRemoteService(ApiClient(httpClient: _authAwareBackend())),
+        authRepository: auth,
+      );
+
+      await expectLater(
+        () => repository.addNew(toyId: 'carrinho', childName: 'X', guardianName: 'B', guardianPhone: '', durationMin: 15, price: 10, ratePerMinute: null),
+        throwsA(isA<ApiUnauthorizedException>()),
+      );
+      expect(auth.isLoggedIn, isFalse);
+      expect(repository.rentals, isEmpty);
     });
   });
 
@@ -288,6 +325,39 @@ void main() {
       expect(seedRental.paymentMethod, isNull); // nunca conta como receita (Rental.isCompleted)
       expect(seedRental.isCompleted, isFalse);
     });
+
+    test('finish() de tempo corrido manda finalPrice pro backend (backend#003)', () async {
+      final seedRental = Rental(id: 'r1', toyId: 'carrinho', childName: 'A', guardianName: 'B', startedAt: DateTime.now(), durationMin: null, ratePerMinute: 1, price: 0, status: RentalStatus.active);
+      Map<String, dynamic>? sentBody;
+      final client = MockClient((request) async {
+        if (request.method == 'PATCH' && request.url.path.endsWith('/finish')) {
+          sentBody = jsonDecode(request.body) as Map<String, dynamic>;
+          return _jsonResponse({..._toJson(seedRental), 'status': 'done', 'paymentMethod': 'pix', 'price': 23.5}, 200);
+        }
+        return _jsonResponse({'error': 'rota não suportada'}, 404);
+      });
+      final repository = _repository(client, operatorLoggedIn: true);
+      repository.rentals.add(seedRental);
+
+      await repository.finish(seedRental.id, PaymentMethod.pix, finalPrice: 23.5);
+
+      expect(sentBody, {'paymentMethod': 'pix', 'finalPrice': 23.5});
+    });
+
+    test('finish() de duração fixa não manda finalPrice', () async {
+      final seedRental = Rental(id: 'r1', toyId: 'carrinho', childName: 'A', guardianName: 'B', startedAt: DateTime.now(), durationMin: 15, price: 10, status: RentalStatus.active);
+      Map<String, dynamic>? sentBody;
+      final client = MockClient((request) async {
+        sentBody = jsonDecode(request.body) as Map<String, dynamic>;
+        return _jsonResponse({..._toJson(seedRental), 'status': 'done', 'paymentMethod': 'dinheiro'}, 200);
+      });
+      final repository = _repository(client, operatorLoggedIn: true);
+      repository.rentals.add(seedRental);
+
+      await repository.finish(seedRental.id, PaymentMethod.dinheiro);
+
+      expect(sentBody, {'paymentMethod': 'dinheiro'});
+    });
   });
 
   group('sincronização entre "aparelhos" (cenário 2)', () {
@@ -299,7 +369,7 @@ void main() {
       );
       final repoB = RentalRepository(
         service: RentalRemoteService(ApiClient(httpClient: client)),
-        authRepository: _FakeDeviceAuth(deviceToken: _deviceToken),
+        authRepository: _adminAuth(),
       );
 
       await repoA.addNew(toyId: 'carrinho', childName: 'Compartilhado', guardianName: 'B', guardianPhone: '', durationMin: 15, price: 10, ratePerMinute: null);
@@ -334,15 +404,4 @@ void main() {
 
     state.dispose();
   });
-}
-
-/// `AuthRepository` de teste com `deviceToken` pronto, sem tocar
-/// storage/rede — mesma técnica de `toy_repository_test.dart` (spec 025).
-class _FakeDeviceAuth extends AuthRepository {
-  _FakeDeviceAuth({required String deviceToken}) : _fakeDeviceToken = deviceToken;
-
-  final String _fakeDeviceToken;
-
-  @override
-  String? get deviceToken => _fakeDeviceToken;
 }

@@ -61,8 +61,8 @@ void main() {
     await _waitUntil(tester, () => find.byKey(TestKeys.businessNameField).evaluate().isEmpty);
     expect(find.byKey(TestKeys.businessNameField), findsNothing); // fechou == salvou
 
-    // 5. Reabre — sessão persistida localmente (flutter_secure_storage real
-    // neste device), não pede login de novo; mostra o valor que acabou de
+    // 5. Reabre — sessão persistida localmente (SharedPreferences real
+    // neste device, spec 027), não pede login de novo; mostra o valor que acabou de
     // salvar, vindo do backend de verdade.
     await tester.tap(find.byKey(TestKeys.settingsGearButton));
     await _waitUntil(tester, () => find.byKey(TestKeys.businessNameField).evaluate().isNotEmpty);

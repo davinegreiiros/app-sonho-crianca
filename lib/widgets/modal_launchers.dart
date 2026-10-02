@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../data/repositories/auth_repository.dart';
 import '../data/repositories/toy_repository.dart';
+import '../test_keys.dart';
 import '../theme/app_colors.dart';
 import '../ui/features/admin_panel/views/admin_panel_view.dart';
 import '../ui/features/business_settings/views/business_settings_view.dart';
@@ -106,9 +108,8 @@ Future<void> confirmEndRental(BuildContext context, ActiveRentalsCubit cubit) as
 /// Opens the "Adicionar brinquedo" form as a modal bottom sheet.
 ///
 /// Guarda de login (spec 025-catalogo-sessao-dispositivo): criar brinquedo
-/// grava autoria de operador real (não a sessão de dispositivo, que só
-/// lê) — mesma guarda de [openBusinessSettingsScreen], reaproveitada via
-/// `ensureOperatorSession`.
+/// grava autoria do administrador — mesma guarda de
+/// [openBusinessSettingsScreen], reaproveitada via `ensureOperatorSession`.
 Future<void> showAddToySheet(BuildContext context) async {
   if (!await ensureOperatorSession(context)) return;
   if (!context.mounted) return;
@@ -156,4 +157,38 @@ Future<void> openAdminPanelScreen(BuildContext context) {
   return Navigator.of(context).push<void>(
     MaterialPageRoute(builder: (context) => const AdminPanelView()),
   );
+}
+
+/// "Sair da conta" do menu do administrador (spec 027-login-admin-sessao):
+/// confirma, apaga a sessão (memória + `SharedPreferences`) e volta pra
+/// escolha de posto. Depois disso o posto fica sem sessão — a próxima
+/// locação pede login, como num aparelho recém-instalado.
+Future<void> confirmAdminLogout(BuildContext context) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      backgroundColor: AppColors.bg,
+      title: const Text('Sair da conta?'),
+      content: const Text(
+        'O aparelho fica sem login de administrador. Para registrar locação nos postos, '
+        'alguém vai precisar entrar de novo.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('Cancelar'),
+        ),
+        TextButton(
+          key: TestKeys.adminLogoutConfirmButton,
+          onPressed: () => Navigator.of(context).pop(true),
+          style: TextButton.styleFrom(foregroundColor: AppColors.accent2_700),
+          child: const Text('Sair'),
+        ),
+      ],
+    ),
+  );
+  if (confirmed != true || !context.mounted) return;
+  final postoSessionCubit = context.read<PostoSessionCubit>();
+  await context.read<AuthRepository>().logout();
+  postoSessionCubit.exitToSelection();
 }

@@ -272,13 +272,11 @@ class NewRentalSheetView extends StatelessWidget {
 }
 
 /// Guarda de login (spec 026-rental-via-backend — "login fica só com o
-/// administrador"): sempre checa sessão de operador real, posto ou
-/// administrador — mas como a sessão persiste no aparelho
-/// (`flutter_secure_storage`, spec 024), na prática só pede login uma
-/// vez, pra quem configurou o aparelho (o administrador); nenhum
-/// monitor rotativo precisa logar depois disso. [createdByMonitorName]
-/// é o rótulo local de quem está no posto (ver `NewRentalCubit.submit`),
-/// nunca quem está logado.
+/// administrador"): sempre checa a sessão do administrador, posto ou
+/// administrador — como ela fica salva no aparelho (spec 027), o posto
+/// só vê login se o administrador nunca entrou, saiu da conta ou o token
+/// venceu. [createdByMonitorName] é o rótulo local de quem está no posto
+/// (ver `NewRentalCubit.submit`), nunca quem está logado.
 Future<void> _submit(BuildContext context, NewRentalCubit cubit, {String? createdByMonitorName}) async {
   if (!await ensureOperatorSession(context)) return;
   if (!context.mounted) return;
