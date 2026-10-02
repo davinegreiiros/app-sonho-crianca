@@ -37,26 +37,6 @@ android {
         versionName = flutter.versionName
     }
 
-    // Flavors dev/prod — mesmo app id base, `dev` ganha um sufixo (instala
-    // lado a lado com `prod` no mesmo aparelho, nome na tela diferente).
-    // Qual backend cada um fala continua por `--dart-define` (API_BASE_URL/
-    // DEVICE_OPERATOR_*, specs 024/025) — o flavor só separa a identidade
-    // do app, não decide ambiente sozinho: `flutter run --flavor dev
-    // --dart-define-from-file=secrets.dev.json` de qualquer forma.
-    flavorDimensions += "env"
-    productFlavors {
-        create("dev") {
-            dimension = "env"
-            applicationIdSuffix = ".dev"
-            versionNameSuffix = "-dev"
-            resValue("string", "app_name", "Sonho (Dev)")
-        }
-        create("prod") {
-            dimension = "env"
-            resValue("string", "app_name", "Sonho de Criança")
-        }
-    }
-
     signingConfigs {
         if (keystorePropertiesFile.exists()) {
             create("release") {
