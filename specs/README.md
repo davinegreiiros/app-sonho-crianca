@@ -52,5 +52,6 @@ Sem `spec.md` aprovado, sem código de feature. Bugfix simples e chore não prec
 | [026](026-rental-via-backend/spec.md) | Rental via backend — login real por turno | Implemented | 025 |
 | [027](027-login-admin-sessao/spec.md) | Login do administrador na entrada + sessão única + logout | Implemented | 026, backend#003 |
 | [028](028-relatorio-dono-whatsapp/spec.md) | Relatório do dono (semana/mês, por monitor, caixa) + envio pelo WhatsApp | Implemented | 014, 023, 026 |
+| [029](029-turno-via-backend/spec.md) | Turno via backend — entrega pelo monitor, fechamento pelo administrador, avisos | Draft | 023, 026, 027, 028, backend#003 |
 
 Todas em `Draft` — cada uma tem "Dúvidas em aberto" que precisa de resposta sua antes de virar `Approved` e ganhar `plan.md`/`tasks.md`.
