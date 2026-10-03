@@ -239,7 +239,8 @@ void main() {
       await tester.pump(_settle);
 
       expect(find.text('Hoje'), findsOneWidget);
-      expect(find.text('14 dias'), findsOneWidget);
+      expect(find.text('Semana'), findsOneWidget);
+      expect(find.text('Mês'), findsOneWidget);
       expect(find.text('Tudo'), findsOneWidget);
 
       await tester.tap(find.text('Tudo'));

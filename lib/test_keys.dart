@@ -72,4 +72,10 @@ class TestKeys {
   static const loginSubmitButton = ValueKey('login_submit_button');
   static const loginErrorText = ValueKey('login_error_text');
   static const loginBackButton = ValueKey('login_back_button');
+
+  // Relatório do dono (spec 028-relatorio-dono-whatsapp)
+  static ValueKey reportPeriod(String period) => ValueKey('report_period_$period');
+  static const reportShareButton = ValueKey('report_share_button');
+  static const reportMonitorSection = ValueKey('report_monitor_section');
+  static const reportCashSection = ValueKey('report_cash_section');
 }

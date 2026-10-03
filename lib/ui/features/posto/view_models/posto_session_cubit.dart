@@ -3,9 +3,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../data/repositories/rental_repository.dart';
 import '../../../../data/repositories/toy_repository.dart';
 import '../../../../data/repositories/turno_repository.dart';
-import '../../../../domain/models/rental.dart';
 import '../../../../domain/models/toy.dart';
 import '../../../../domain/models/turno.dart';
+import '../../../../domain/use_cases/compute_turno_cash.dart';
 import 'posto_session_state.dart';
 
 /// ViewModel for the posto session (spec 023-posto-monitor-painel) —
@@ -39,6 +39,7 @@ class PostoSessionCubit extends Cubit<PostoSessionState> {
   final ToyRepository _toyRepository;
   final RentalRepository _rentalRepository;
   final TurnoRepository _turnoRepository;
+  static const _computeTurnoCash = ComputeTurnoCash();
 
   static List<PostoSummary> _computePostos(List<Toy> toys, List<Turno> turnos) =>
       toys.map((t) => (toy: t, openTurno: _openTurnoFor(turnos, t.id))).toList();
@@ -90,17 +91,10 @@ class PostoSessionCubit extends Cubit<PostoSessionState> {
     final openedAt = state.turnoOpenedAt;
     final monitorName = state.monitorName;
     if (toyId == null || openedAt == null || monitorName == null) return;
-    final finished = _rentalRepository.rentals.where(
-      (r) =>
-          r.toyId == toyId &&
-          r.status == RentalStatus.done &&
-          r.endedAt != null &&
-          !r.endedAt!.isBefore(openedAt) &&
-          r.finishedByMonitorName == monitorName,
-    );
-    final expected = <PaymentMethod, double>{
-      for (final m in PaymentMethod.values) m: finished.where((r) => r.paymentMethod == m).fold(0.0, (a, r) => a + r.price),
-    };
+    final finished = _computeTurnoCash
+        .rentalsIn(toyId: toyId, monitorName: monitorName, openedAt: openedAt, rentals: _rentalRepository.rentals)
+        .toList();
+    final expected = _computeTurnoCash.expectedByMethod(finished);
     emit(state.copyWith(closingExpectedByMethod: expected, closingCountedCashInput: '', closingLocCount: finished.length));
   }
 

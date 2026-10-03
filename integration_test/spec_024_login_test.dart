@@ -3,8 +3,15 @@
 // Precisa de device/emulador real (`flutter test integration_test/spec_024_login_test.dart
 // -d <device-id>`) — web não é suportado pelo `integration_test`.
 //
-// Credenciais: operador `t20smoke` seedado via `npm run seed:operator` no
-// repo backend, só pra este smoke-test.
+// Credenciais: um operador de teste ativo, via `--dart-define-from-file=secrets.json`
+// (`T20_USERNAME`/`T20_PASSWORD`, ver `secrets.example.json`) — nunca no código.
+// Sem elas o teste é pulado. Criar/reativar o operador no painel do backend
+// (`/painel`) e desativar de novo depois de rodar.
+//
+// Atenção: o passo 4 grava `BusinessSettings` de verdade (nome, cidade, chave
+// Pix) no backend de produção. Com cliente usando o app, rodar só contra um
+// backend de teste (`--dart-define=API_BASE_URL=...`) ou restaurar os valores
+// reais logo depois.
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
@@ -13,6 +20,8 @@ import 'package:sonho_de_crianca/main.dart';
 import 'package:sonho_de_crianca/test_keys.dart';
 
 const _settle = Duration(milliseconds: 500);
+const _username = String.fromEnvironment('T20_USERNAME');
+const _password = String.fromEnvironment('T20_PASSWORD');
 
 /// Pumps generosos — é rede real (Vercel + Atlas), não um `MockClient`
 /// instantâneo. Poll em vez de contar frames no chute, mesmo racional dos
@@ -38,7 +47,7 @@ void main() {
     expect(find.byKey(TestKeys.businessNameField), findsNothing);
 
     // 2. Senha errada -> erro específico de credencial, continua na tela.
-    await tester.enterText(find.byKey(TestKeys.loginUsernameField), 't20smoke');
+    await tester.enterText(find.byKey(TestKeys.loginUsernameField), _username);
     await tester.enterText(find.byKey(TestKeys.loginPasswordField), 'senha-errada-de-proposito');
     await tester.pump();
     await tester.tap(find.byKey(TestKeys.loginSubmitButton));
@@ -46,7 +55,7 @@ void main() {
     expect(find.byKey(TestKeys.loginErrorText), findsOneWidget);
 
     // 3. Credenciais corretas -> segue pra Configurações de verdade.
-    await tester.enterText(find.byKey(TestKeys.loginPasswordField), 'T20Smoke!2026');
+    await tester.enterText(find.byKey(TestKeys.loginPasswordField), _password);
     await tester.pump();
     await tester.tap(find.byKey(TestKeys.loginSubmitButton));
     await _waitUntil(tester, () => find.byKey(TestKeys.businessNameField).evaluate().isNotEmpty);
@@ -68,5 +77,5 @@ void main() {
     await _waitUntil(tester, () => find.byKey(TestKeys.businessNameField).evaluate().isNotEmpty);
     expect(find.byKey(TestKeys.loginUsernameField), findsNothing); // não pediu login de novo
     expect(find.text('Sonho de Criança (smoke T20)'), findsOneWidget);
-  });
+  }, skip: _username.isEmpty || _password.isEmpty);
 }

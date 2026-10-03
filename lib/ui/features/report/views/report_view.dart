@@ -4,11 +4,13 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../domain/formatters.dart';
 import '../../../../domain/models/rental.dart';
 import '../../../../domain/models/toy.dart';
+import '../../../../test_keys.dart';
 import '../../../../theme/app_colors.dart';
 import '../../../../widgets/animations/cascade.dart';
 import '../../../../widgets/animations/pressable.dart';
 import '../view_models/report_cubit.dart';
 import '../view_models/report_state.dart';
+import '../view_models/report_summary.dart';
 
 /// Migrated in spec 014-migracao-relatorio: reads/writes through
 /// [ReportCubit] instead of `AppState`.
@@ -61,6 +63,8 @@ class _ReportViewState extends State<ReportView> with TickerProviderStateMixin {
             ],
           ),
         ),
+        const SizedBox(height: 10),
+        _ShareButton(cubit: cubit),
         const SizedBox(height: 18),
         Text(
           'POR FORMA DE PAGAMENTO',
@@ -84,6 +88,23 @@ class _ReportViewState extends State<ReportView> with TickerProviderStateMixin {
         const SizedBox(height: 6),
         for (final entry in report.toyBreakdown)
           _ToyBreakdownRow(toy: entry.toy, count: entry.count, amount: entry.total),
+        const SizedBox(height: 18),
+        Text(
+          'POR MONITOR',
+          key: TestKeys.reportMonitorSection,
+          style: TextStyle(fontSize: 10.5, letterSpacing: 1, color: AppColors.text.withValues(alpha: 0.6)),
+        ),
+        const SizedBox(height: 6),
+        for (final entry in report.monitorBreakdown)
+          _MonitorRow(name: entry.name, count: entry.count, amount: entry.total),
+        const SizedBox(height: 18),
+        Text(
+          'CAIXA',
+          key: TestKeys.reportCashSection,
+          style: TextStyle(fontSize: 10.5, letterSpacing: 1, color: AppColors.text.withValues(alpha: 0.6)),
+        ),
+        const SizedBox(height: 6),
+        _CashSection(report: report),
         const SizedBox(height: 18),
         Text(
           'HISTÓRICO',
@@ -114,7 +135,8 @@ class _PeriodSelector extends StatelessWidget {
   Widget build(BuildContext context) {
     final options = [
       (p: ReportPeriod.today, label: 'Hoje'),
-      (p: ReportPeriod.week, label: '14 dias'),
+      (p: ReportPeriod.week, label: 'Semana'),
+      (p: ReportPeriod.month, label: 'Mês'),
       (p: ReportPeriod.all, label: 'Tudo'),
     ];
     return Container(
@@ -137,6 +159,7 @@ class _PeriodSelector extends StatelessWidget {
     final selected = period == o.p;
     return Pressable(
       child: InkWell(
+        key: TestKeys.reportPeriod(o.p.name),
         onTap: () => cubit.setPeriod(o.p),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 160),
@@ -157,6 +180,127 @@ class _PeriodSelector extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// "Enviar resumo" (spec 028): abre a folha de compartilhamento do sistema
+/// com o resumo do período. Passa o retângulo do próprio botão — no iPad a
+/// folha abre como popover ancorado nele.
+class _ShareButton extends StatelessWidget {
+  const _ShareButton({required this.cubit});
+  final ReportCubit cubit;
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton.icon(
+      key: TestKeys.reportShareButton,
+      onPressed: () {
+        final box = context.findRenderObject() as RenderBox?;
+        final origin = box == null ? null : box.localToGlobal(Offset.zero) & box.size;
+        cubit.shareSummary(origin: origin);
+      },
+      icon: const Icon(Icons.ios_share, size: 18),
+      label: const Text('Enviar resumo'),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: AppColors.accent700,
+        side: BorderSide(color: AppColors.accent.withValues(alpha: 0.5)),
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+        textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+      ),
+    );
+  }
+}
+
+class _MonitorRow extends StatelessWidget {
+  const _MonitorRow({required this.name, required this.count, required this.amount});
+  final String name;
+  final int count;
+  final double amount;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(border: Border(bottom: BorderSide(color: AppColors.text.withValues(alpha: 0.08)))),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+          ),
+          Text('${count}x', style: TextStyle(fontSize: 12, color: AppColors.text.withValues(alpha: 0.6))),
+          const SizedBox(width: 8),
+          Text(formatMoney(amount), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
+}
+
+/// Diferenças de caixa dos turnos fechados no período (spec 028) — mesmas
+/// cores do fechamento de turno (3c): verde quando bateu, destaque quando não.
+class _CashSection extends StatelessWidget {
+  const _CashSection({required this.report});
+  final ReportState report;
+
+  @override
+  Widget build(BuildContext context) {
+    final muted = TextStyle(fontSize: 13, color: AppColors.text.withValues(alpha: 0.6));
+    if (report.closedTurnosCount == 0) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Text('Nenhum turno fechado nesse período.', style: muted),
+      );
+    }
+    if (report.cashDiffTurnos.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Text(
+          'Caixa bateu em todos os turnos (${report.closedTurnosCount}).',
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.statusOk),
+        ),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 4),
+          child: Text(
+            '${report.closedTurnosCount} ${report.closedTurnosCount == 1 ? 'turno' : 'turnos'}, '
+            '${report.cashDiffTurnos.length} com diferença · saldo ${formatSignedMoney(report.cashDiffTotal)}',
+            style: muted,
+          ),
+        ),
+        for (final e in report.cashDiffTurnos)
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            decoration: BoxDecoration(border: Border(bottom: BorderSide(color: AppColors.text.withValues(alpha: 0.08)))),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${e.turno.monitorName} · ${e.toy.name}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                      ),
+                      Text(formatRelativeTime(e.turno.closedAt!), style: TextStyle(fontSize: 11, color: AppColors.text.withValues(alpha: 0.6))),
+                    ],
+                  ),
+                ),
+                Text(
+                  formatSignedMoney(e.diff),
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.accent2_700),
+                ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 }
