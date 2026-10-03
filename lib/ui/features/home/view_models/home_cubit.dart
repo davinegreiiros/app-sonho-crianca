@@ -44,7 +44,7 @@ class HomeCubit extends Cubit<HomeState> {
   static HomeState _compute(List<Toy> toys, List<Rental> rentals, ComputeToyAvailability computeToyAvailability) {
     final activeRentals = rentals.where((r) => r.status == RentalStatus.active).toList();
     final doneToday = rentals
-        .where((r) => r.status == RentalStatus.done && r.endedAt != null && !r.endedAt!.isBefore(_startOfDay))
+        .where((r) => r.isCompleted && r.endedAt != null && !r.endedAt!.isBefore(_startOfDay))
         .toList();
     final homeTotalToday = doneToday.fold(0.0, (a, r) => a + r.price);
 
@@ -64,6 +64,7 @@ class HomeCubit extends Cubit<HomeState> {
       doneTodayCount: doneToday.length,
       homeTotalToday: homeTotalToday,
       toys: toys,
+      now: DateTime.now(),
     );
   }
 

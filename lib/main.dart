@@ -12,9 +12,10 @@ import 'data/repositories/turno_repository.dart';
 import 'data/services/api_client.dart';
 import 'data/services/app_database.dart';
 import 'data/services/business_settings_remote_service.dart';
-import 'data/services/rental_local_service.dart';
+import 'data/services/rental_remote_service.dart';
 import 'data/services/toy_remote_service.dart';
 import 'data/services/turno_local_service.dart';
+import 'domain/text_sharer.dart';
 import 'screens/home_shell.dart';
 import 'state/app_state.dart';
 import 'theme/app_theme.dart';
@@ -50,23 +51,33 @@ Future<void> main() async {
     service: ToyRemoteService(ApiClient()),
     authRepository: authRepository,
   );
-  final rentalRepository = RentalRepository(localService: RentalLocalService(appDatabase));
+  final rentalRepository = RentalRepository(
+    service: RentalRemoteService(ApiClient()),
+    authRepository: authRepository,
+  );
   final turnoRepository = TurnoRepository(localService: TurnoLocalService(appDatabase));
   await Future.wait([
     // Só lê sessão salva localmente (sem rede) — `BusinessSettings` busca
     // no backend sob demanda, quando a tela de Configurações abre de
     // verdade (spec 024-sync-backend-fundacao), não aqui no boot.
     authRepository.restoreSession(),
-    rentalRepository.load(),
     turnoRepository.load(),
   ]);
-  // Sessão de dispositivo + catálogo em segundo plano (spec 025): são
-  // chamadas de rede, não podem travar o boot do jeito que o SQLite local
-  // de antes não travava (cenário 4 — sem internet, não pode travar nem
-  // ficar em branco). O app nasce com o catálogo seed/último bom e
-  // atualiza sozinho (`ToyRepository` é `ChangeNotifier`) assim que
-  // `load()` resolver — `PostoSessionCubit` já escuta essa mudança.
-  unawaited(authRepository.loginDevice().then((_) => toyRepository.load()));
+  // Catálogo + locações em segundo plano (specs 025/026): são chamadas de
+  // rede, não podem travar o boot (cenário 4/5 — sem internet, não pode
+  // travar nem ficar em branco). O app nasce com o catálogo/histórico
+  // seed/último bom e atualiza sozinho (`ChangeNotifier`) assim que
+  // `load()` resolver. Uma sessão só, a do administrador (spec 027): sem
+  // ela os `load()` não chamam nada, e cada login novo dispara a busca de
+  // novo — o administrador que acabou de entrar já vê o dado do servidor.
+  void loadRemoteData() => unawaited(Future.wait([toyRepository.load(), rentalRepository.load()]));
+  var lastToken = authRepository.token;
+  authRepository.addListener(() {
+    final token = authRepository.token;
+    if (token != null && token != lastToken) loadRemoteData();
+    lastToken = token;
+  });
+  loadRemoteData();
 
   runApp(SonhoDeCriancaApp(
     authRepository: authRepository,
@@ -95,6 +106,7 @@ class SonhoDeCriancaApp extends StatelessWidget {
     this.toyRepository,
     this.rentalRepository,
     this.turnoRepository,
+    this.textSharer,
     this.startInPostoAdminMode = false,
   });
 
@@ -103,6 +115,10 @@ class SonhoDeCriancaApp extends StatelessWidget {
   final ToyRepository? toyRepository;
   final RentalRepository? rentalRepository;
   final TurnoRepository? turnoRepository;
+
+  /// Saída do "Enviar resumo" do relatório (spec 028). `null` = folha de
+  /// compartilhamento real; teste passa um fake.
+  final TextSharer? textSharer;
   final bool startInPostoAdminMode;
 
   @override
@@ -134,7 +150,11 @@ class SonhoDeCriancaApp extends StatelessWidget {
               ),
         ),
         ChangeNotifierProvider<RentalRepository>(
-          create: (_) => rentalRepository ?? RentalRepository(),
+          create: (context) => rentalRepository ??
+              RentalRepository(
+                service: RentalRemoteService(ApiClient()),
+                authRepository: context.read<AuthRepository>(),
+              ),
         ),
         ChangeNotifierProvider<TurnoRepository>(
           create: (_) => turnoRepository ?? TurnoRepository(),
@@ -161,7 +181,12 @@ class SonhoDeCriancaApp extends StatelessWidget {
                 create: (context) => ToyCatalogCubit(context.read<ToyRepository>(), context.read<RentalRepository>()),
               ),
               BlocProvider<ReportCubit>(
-                create: (context) => ReportCubit(context.read<RentalRepository>(), context.read<ToyRepository>()),
+                create: (context) => ReportCubit(
+                  context.read<RentalRepository>(),
+                  context.read<ToyRepository>(),
+                  turnoRepository: context.read<TurnoRepository>(),
+                  textSharer: textSharer,
+                ),
               ),
               BlocProvider<NewRentalCubit>(
                 create: (context) => NewRentalCubit(context.read<ToyRepository>(), context.read<RentalRepository>()),

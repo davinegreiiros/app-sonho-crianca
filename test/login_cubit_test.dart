@@ -11,13 +11,13 @@ import 'package:sonho_de_crianca/ui/features/auth/view_models/login_cubit.dart';
 import 'package:sonho_de_crianca/ui/features/auth/view_models/login_state.dart';
 
 import 'fakes/fake_auth_backend.dart';
-import 'fakes/fake_secure_storage.dart';
+import 'fakes/fake_session_storage.dart';
 
 const _maria = Operator(id: 'op1', name: 'Maria Souza', username: 'maria');
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  setUp(setUpFakeSecureStorage);
+  setUp(setUpFakeSessionStorage);
 
   blocTest<LoginCubit, LoginState>(
     'campos vazios: erro de credencial sem chamar o backend',

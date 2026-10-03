@@ -7,23 +7,24 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:sonho_de_crianca/data/repositories/rental_repository.dart';
+import 'package:sonho_de_crianca/domain/models/business_settings.dart';
 import 'package:sonho_de_crianca/main.dart';
 import 'package:sonho_de_crianca/state/app_state.dart';
 import 'package:sonho_de_crianca/test_keys.dart';
 
 import 'fakes/fake_business_settings.dart';
+import 'fakes/fake_rental_backend.dart';
 
-Future<AppState> _pumpApp(WidgetTester tester) async {
+Future<AppState> _pumpApp(WidgetTester tester, {BusinessSettings backendSettings = const BusinessSettings()}) async {
   // Every scenario here finishes the seed's first active rental — needs
   // the demo data (spec 020-persistencia-local: the real app's default
   // RentalRepository starts empty, so tests that need `a1`-`a3` ask for
   // it explicitly).
   final authRepository = fakeLoggedInAuthRepository();
   await tester.pumpWidget(SonhoDeCriancaApp(
-    rentalRepository: RentalRepository.withDemoSeed(),
+    rentalRepository: fakeSeededRentalRepository(authRepository: authRepository),
     authRepository: authRepository,
-    businessSettingsRepository: fakeBusinessSettingsRepository(authRepository: authRepository),
+    businessSettingsRepository: fakeBusinessSettingsRepository(initial: backendSettings, authRepository: authRepository),
     startInPostoAdminMode: true,
   ));
   await tester.pump(const Duration(milliseconds: 400));
@@ -115,5 +116,31 @@ void main() {
     final finished = state.rentals.firstWhere((r) => r.id == rental.id);
     expect(finished.status.name, 'done');
     expect(finished.paymentMethod?.name, 'pix');
+  });
+
+  testWidgets('Pix num cold start busca as configurações no backend antes de decidir (não manda pra "configure")', (tester) async {
+    // Backend já configurado, mas o app nunca abriu Configurações nesta
+    // sessão — o Cubit ainda tem o valor vazio padrão (status `idle`).
+    final state = await _pumpApp(
+      tester,
+      backendSettings: const BusinessSettings(merchantName: 'Sonho de Criança', merchantCity: 'Fortaleza', pixKey: '85999998888'),
+    );
+    final rental = state.activeRentals.first;
+
+    await tester.tap(find.byKey(TestKeys.navActive));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.ensureVisible(find.byKey(TestKeys.finishRentalButton(rental.id)));
+    await tester.pump();
+    await tester.tap(find.byKey(TestKeys.finishRentalButton(rental.id)));
+    await _settle(tester);
+
+    await tester.tap(find.byKey(TestKeys.paymentOption('pix')));
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.tap(find.byKey(TestKeys.confirmEndButton));
+    await _settle(tester);
+
+    expect(find.byKey(TestKeys.pixQrImage), findsOneWidget);
+    expect(find.byKey(TestKeys.businessNameField), findsNothing);
+    expect(state.rentals.firstWhere((r) => r.id == rental.id).status.name, 'active');
   });
 }

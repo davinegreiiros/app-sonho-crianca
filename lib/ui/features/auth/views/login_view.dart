@@ -7,9 +7,10 @@ import '../../../../widgets/animations/pressable.dart';
 import '../view_models/login_cubit.dart';
 import '../view_models/login_state.dart';
 
-/// Tela de login de operador (spec 024-sync-backend-fundacao) — única
-/// porta de entrada pra `BusinessSettingsView` (guarda em
-/// `openBusinessSettingsScreen`, `lib/widgets/modal_launchers.dart`).
+/// Tela de login do administrador (spec 024-sync-backend-fundacao) —
+/// aberta por "Entrar como administrador" (sempre, spec 027) e pela guarda
+/// `ensureOperatorSession` (`lib/widgets/auth_gate.dart`) nas ações que
+/// exigem sessão.
 /// `Navigator.pop(true)` no sucesso; `pop(false)`/`pop()` se o operador
 /// voltar sem logar — quem chamou decide o que fazer com o resultado.
 class LoginView extends StatefulWidget {
@@ -73,7 +74,7 @@ class _LoginViewState extends State<LoginView> {
                     const Text('Entrar', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w600, height: 1.05)),
                     const SizedBox(height: 4),
                     Text(
-                      'Login de operador — necessário pra configurar o negócio.',
+                      'Acesso do administrador.',
                       style: TextStyle(fontSize: 12.5, color: AppColors.text.withValues(alpha: 0.68)),
                     ),
                     const SizedBox(height: 24),

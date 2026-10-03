@@ -2,32 +2,64 @@
 // tempo" chips only show on a fixed-duration active card, and the overtime
 // alarm icon only shows once a fixed-duration rental has run past its
 // duration.
+//
+// Migrado na spec 026-rental-via-backend: `AppState.submitNew` foi
+// removido — cria a locação via `NewRentalCubit` direto (mesmo Cubit que
+// a UI usa desde a spec 017); injeta `toyRepository`/`rentalRepository`/
+// `authRepository` fakes (sem isso, cairia no backend real assim que a
+// locação fosse criada).
 
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:sonho_de_crianca/main.dart';
+import 'package:sonho_de_crianca/data/repositories/rental_repository.dart';
+import 'package:sonho_de_crianca/data/services/api_client.dart';
+import 'package:sonho_de_crianca/data/services/rental_remote_service.dart';
 import 'package:sonho_de_crianca/domain/models/rental.dart';
+import 'package:sonho_de_crianca/domain/models/toy.dart';
+import 'package:sonho_de_crianca/main.dart';
 import 'package:sonho_de_crianca/state/app_state.dart';
 import 'package:sonho_de_crianca/test_keys.dart';
+import 'package:sonho_de_crianca/ui/features/rental/view_models/new_rental_cubit.dart';
+
+import 'fakes/fake_business_settings.dart';
+import 'fakes/fake_rental_backend.dart';
+import 'fakes/fake_toy_backend.dart';
+
+Future<AppState> _pumpApp(WidgetTester tester) async {
+  final authRepository = fakeLoggedInAuthRepository();
+  await tester.pumpWidget(SonhoDeCriancaApp(
+    authRepository: authRepository,
+    toyRepository: fakeToyRepository(initial: kInitialToys, authRepository: authRepository),
+    rentalRepository: RentalRepository(
+      service: RentalRemoteService(ApiClient(httpClient: fakeRentalBackend())),
+      authRepository: authRepository,
+    ),
+    startInPostoAdminMode: true,
+  ));
+  await tester.pump(const Duration(milliseconds: 400));
+  return Provider.of<AppState>(tester.element(find.byType(MaterialApp)), listen: false);
+}
+
+NewRentalCubit _newRentalCubit(WidgetTester tester) =>
+    BlocProvider.of<NewRentalCubit>(tester.element(find.byType(MaterialApp)), listen: false);
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   SharedPreferences.setMockInitialValues({});
 
   testWidgets('"+ tempo" chips show on a fixed-duration card and extend it on tap', (tester) async {
-    await tester.pumpWidget(const SonhoDeCriancaApp(startInPostoAdminMode: true));
-    await tester.pump(const Duration(milliseconds: 400));
-    final state = Provider.of<AppState>(tester.element(find.byType(MaterialApp)), listen: false);
+    final state = await _pumpApp(tester);
+    final newRentalCubit = _newRentalCubit(tester);
 
-    state.openNew();
-    state.setDraftToy('cama'); // blockMin 30, price 15 -> 0.50/min
-    state.setDraftChild('Fixo Extend');
-    state.applyDuration(15); // price = round(15 * 15/30) = 8
-    state.submitNew();
-    final rental = state.rentals.firstWhere((r) => r.childName == 'Fixo Extend');
+    newRentalCubit.setToy('cama'); // blockMin 30, price 15 -> 0.50/min
+    newRentalCubit.setChildName('Fixo Extend');
+    newRentalCubit.applyDuration(15); // price = round(15 * 15/30) = 8
+    final rental = await newRentalCubit.submit();
+    await tester.pump(const Duration(milliseconds: 400));
 
     await tester.tap(find.byKey(TestKeys.navActive));
     await tester.pump(const Duration(milliseconds: 400));
@@ -44,16 +76,14 @@ void main() {
   });
 
   testWidgets('"+ tempo" chips are absent on a tempo corrido (open-ended) card', (tester) async {
-    await tester.pumpWidget(const SonhoDeCriancaApp(startInPostoAdminMode: true));
-    await tester.pump(const Duration(milliseconds: 400));
-    final state = Provider.of<AppState>(tester.element(find.byType(MaterialApp)), listen: false);
+    await _pumpApp(tester);
+    final newRentalCubit = _newRentalCubit(tester);
 
-    state.openNew();
-    state.setDraftToy('cama');
-    state.setDraftChild('Aberta Extend');
-    state.setDraftOpenEnded(true);
-    state.submitNew();
-    final rental = state.rentals.firstWhere((r) => r.childName == 'Aberta Extend');
+    newRentalCubit.setToy('cama');
+    newRentalCubit.setChildName('Aberta Extend');
+    newRentalCubit.setOpenEnded(true);
+    final rental = await newRentalCubit.submit();
+    await tester.pump(const Duration(milliseconds: 400));
 
     await tester.tap(find.byKey(TestKeys.navActive));
     await tester.pump(const Duration(milliseconds: 400));
@@ -66,16 +96,14 @@ void main() {
   testWidgets('overtime freezes the clock at 00:00 and shows "TEMPO ESGOTADO" once a fixed-duration rental runs past its time', (
     tester,
   ) async {
-    await tester.pumpWidget(const SonhoDeCriancaApp(startInPostoAdminMode: true));
-    await tester.pump(const Duration(milliseconds: 400));
-    final state = Provider.of<AppState>(tester.element(find.byType(MaterialApp)), listen: false);
+    final state = await _pumpApp(tester);
+    final newRentalCubit = _newRentalCubit(tester);
 
-    state.openNew();
-    state.setDraftToy('cama');
-    state.setDraftChild('Estourada');
-    state.applyDuration(10);
-    state.submitNew();
-    final rental = state.rentals.firstWhere((r) => r.childName == 'Estourada');
+    newRentalCubit.setToy('cama');
+    newRentalCubit.setChildName('Estourada');
+    newRentalCubit.applyDuration(10);
+    final rental = await newRentalCubit.submit();
+    await tester.pump(const Duration(milliseconds: 400));
 
     // Not yet overtime.
     await tester.tap(find.byKey(TestKeys.navActive));

@@ -6,12 +6,12 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:sonho_de_crianca/data/repositories/rental_repository.dart';
 import 'package:sonho_de_crianca/domain/models/rental.dart';
 import 'package:sonho_de_crianca/domain/use_cases/schedule_rental_end_notifications.dart';
 import 'package:sonho_de_crianca/state/app_state.dart';
 import 'package:sonho_de_crianca/ui/features/rental/view_models/new_rental_cubit.dart';
 
+import 'fakes/fake_rental_backend.dart';
 import 'fakes/fake_rental_notifier.dart';
 import 'fakes/fake_toy_backend.dart';
 
@@ -22,11 +22,11 @@ void main() {
   SharedPreferences.setMockInitialValues({});
 
   group('RentalRepository.addNew', () {
-    test('builds an active Rental with a unique, non-colliding id and adds it', () {
-      final repository = RentalRepository();
+    test('builds an active Rental and adds it (sessão de operador real — spec 026)', () async {
+      final repository = fakeRentalRepository();
       final before = repository.rentals.length;
 
-      final rental = repository.addNew(
+      final rental = await repository.addNew(
         toyId: 'carrinho',
         childName: 'Teste',
         guardianName: 'Responsável',
@@ -37,7 +37,6 @@ void main() {
       );
 
       expect(repository.rentals, hasLength(before + 1));
-      expect(rental.id, startsWith('r'));
       expect(repository.rentals.any((r) => r.id == rental.id), isTrue);
       expect(rental.status, RentalStatus.active);
       expect(rental.toyId, 'carrinho');
@@ -91,7 +90,7 @@ void main() {
 
   group('NewRentalCubit', () {
     test('opens with the first available toy and its default duration/price', () {
-      final cubit = NewRentalCubit(fakeToyRepository(), RentalRepository(), notifications: FakeRentalNotifier());
+      final cubit = NewRentalCubit(fakeToyRepository(), fakeRentalRepository(), notifications: FakeRentalNotifier());
 
       // Seed: 'carrinho' (qty 2, 1 active) is first in kInitialToys and
       // still has 1 free unit, so it's the default pick.
@@ -104,7 +103,7 @@ void main() {
     });
 
     test('setToy() resets duration/price to the new toy and clears the custom rate', () {
-      final cubit = NewRentalCubit(fakeToyRepository(), RentalRepository(), notifications: FakeRentalNotifier());
+      final cubit = NewRentalCubit(fakeToyRepository(), fakeRentalRepository(), notifications: FakeRentalNotifier());
       cubit.setCustomRate(2.5);
 
       cubit.setToy('cama'); // qty 1, blockMin 30, price 15
@@ -118,7 +117,7 @@ void main() {
     });
 
     test('applyDuration() scales price proportionally, same formula as before', () {
-      final cubit = NewRentalCubit(fakeToyRepository(), RentalRepository(), notifications: FakeRentalNotifier());
+      final cubit = NewRentalCubit(fakeToyRepository(), fakeRentalRepository(), notifications: FakeRentalNotifier());
       cubit.setToy('cama'); // blockMin 30, price 15 -> R$0,50/min
 
       cubit.applyDuration(10);
@@ -129,13 +128,13 @@ void main() {
       cubit.close();
     });
 
-    test('submit() writes through RentalRepository and schedules its notifications', () {
-      final rentalRepository = RentalRepository();
+    test('submit() writes through RentalRepository and schedules its notifications', () async {
+      final rentalRepository = fakeRentalRepository();
       final notifier = FakeRentalNotifier();
       final cubit = NewRentalCubit(fakeToyRepository(), rentalRepository, notifications: notifier);
       cubit.setChildName('Teste Nova Locação');
 
-      final rental = cubit.submit();
+      final rental = await cubit.submit();
 
       expect(rentalRepository.rentals.any((r) => r.id == rental.id), isTrue);
       expect(rental.childName, 'Teste Nova Locação');
@@ -144,9 +143,9 @@ void main() {
       cubit.close();
     });
 
-    test('shares the created rental with AppState.rentals when Repositories are injected', () {
+    test('shares the created rental with AppState.rentals when Repositories are injected', () async {
       final toyRepository = fakeToyRepository();
-      final rentalRepository = RentalRepository();
+      final rentalRepository = fakeRentalRepository();
       final cubit = NewRentalCubit(toyRepository, rentalRepository, notifications: FakeRentalNotifier());
       final state = AppState(
         notifications: FakeRentalNotifier(),
@@ -155,7 +154,7 @@ void main() {
       );
       cubit.setChildName('Teste Compartilhado');
 
-      final rental = cubit.submit();
+      final rental = await cubit.submit();
 
       expect(state.rentals.any((r) => r.id == rental.id), isTrue);
 

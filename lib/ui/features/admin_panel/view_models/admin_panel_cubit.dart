@@ -6,6 +6,7 @@ import '../../../../data/repositories/turno_repository.dart';
 import '../../../../domain/models/rental.dart';
 import '../../../../domain/models/toy.dart';
 import '../../../../domain/models/turno.dart';
+import '../../../../domain/use_cases/compute_turno_cash.dart';
 import 'admin_panel_state.dart';
 
 /// ViewModel for [AdminPanelView] (3d, spec 023-posto-monitor-painel) —
@@ -29,6 +30,7 @@ class AdminPanelCubit extends Cubit<AdminPanelState> {
   final RentalRepository _rentalRepository;
   final ToyRepository _toyRepository;
   final TurnoRepository _turnoRepository;
+  static const _computeTurnoCash = ComputeTurnoCash();
 
   void _onChanged() => emit(_compute(_rentalRepository.rentals, _toyRepository.toys, _turnoRepository.turnos));
 
@@ -41,30 +43,35 @@ class AdminPanelCubit extends Cubit<AdminPanelState> {
 
   static AdminPanelState _compute(List<Rental> rentals, List<Toy> toys, List<Turno> turnos) {
     final startOfDay = _startOfDay;
-    final doneToday = rentals.where((r) => r.status == RentalStatus.done && r.endedAt != null && !r.endedAt!.isBefore(startOfDay)).toList();
+    final doneToday = rentals.where((r) => r.isCompleted && r.endedAt != null && !r.endedAt!.isBefore(startOfDay)).toList();
 
     final totalGrossToday = doneToday.fold(0.0, (a, r) => a + r.price);
 
-    final trail = [...doneToday]..sort((a, b) => b.endedAt!.compareTo(a.endedAt!));
+    final trail = <TrailEntry>[
+      for (final r in rentals)
+        if (!r.startedAt.isBefore(startOfDay))
+          (toy: _toyById(toys, r.toyId), rental: r, action: TrailAction.created, at: r.startedAt, actor: r.createdByMonitorName),
+      for (final r in doneToday)
+        (toy: _toyById(toys, r.toyId), rental: r, action: TrailAction.finished, at: r.endedAt!, actor: r.finishedByMonitorName),
+    ]..sort((a, b) => b.at.compareTo(a.at));
 
     final turnosToday = turnos.where((t) => !t.openedAt.isBefore(startOfDay)).toList()..sort((a, b) => b.openedAt.compareTo(a.openedAt));
 
     final turnRows = turnosToday.map((turno) {
-      final windowEnd = turno.closedAt ?? DateTime.now();
-      final inTurno = rentals.where(
-        (r) =>
-            r.toyId == turno.toyId &&
-            r.status == RentalStatus.done &&
-            r.endedAt != null &&
-            !r.endedAt!.isBefore(turno.openedAt) &&
-            !r.endedAt!.isAfter(windowEnd),
-      );
+      // Cancelada (`done` sem pagamento, spec 026) não conta como locação
+      // nem soma no bruto do turno.
+      final inTurno = _computeTurnoCash
+          .rentalsIn(
+            toyId: turno.toyId,
+            monitorName: turno.monitorName,
+            openedAt: turno.openedAt,
+            until: turno.closedAt ?? DateTime.now(),
+            rentals: rentals,
+          )
+          .where((r) => r.isCompleted)
+          .toList();
       final gross = inTurno.fold(0.0, (a, r) => a + r.price);
-      double? diff;
-      if (turno.closedAt != null && turno.countedCash != null) {
-        final cashExpected = inTurno.where((r) => r.paymentMethod == PaymentMethod.dinheiro).fold(0.0, (a, r) => a + r.price);
-        diff = turno.countedCash! - cashExpected;
-      }
+      final diff = _computeTurnoCash.cashDifference(turno, rentals);
       return (
         toy: _toyById(toys, turno.toyId),
         monitorName: turno.monitorName,
@@ -79,7 +86,7 @@ class AdminPanelCubit extends Cubit<AdminPanelState> {
       totalGrossToday: totalGrossToday,
       totalLocToday: doneToday.length,
       turnRows: turnRows,
-      trail: trail.map((r) => (toy: _toyById(toys, r.toyId), rental: r)).toList(),
+      trail: trail,
     );
   }
 

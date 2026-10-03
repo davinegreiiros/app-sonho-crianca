@@ -5,11 +5,11 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:sonho_de_crianca/data/repositories/rental_repository.dart';
 import 'package:sonho_de_crianca/domain/models/rental.dart';
 import 'package:sonho_de_crianca/state/app_state.dart';
 import 'package:sonho_de_crianca/ui/features/home/view_models/home_cubit.dart';
 
+import 'fakes/fake_rental_backend.dart';
 import 'fakes/fake_rental_notifier.dart';
 import 'fakes/fake_toy_backend.dart';
 
@@ -18,7 +18,7 @@ void main() {
 
   group('HomeCubit', () {
     test('seed: 3 active, h1-h3 finished today (35 total), h4-h8 finished earlier', () {
-      final cubit = HomeCubit(fakeToyRepository(), RentalRepository.withDemoSeed());
+      final cubit = HomeCubit(fakeToyRepository(), fakeSeededRentalRepository());
 
       expect(cubit.state.activeCount, 3);
       expect(cubit.state.doneTodayCount, 3);
@@ -27,8 +27,20 @@ void main() {
       cubit.close();
     });
 
+    test('1s ticker emits a new state even when nothing else changed', () async {
+      final cubit = HomeCubit(fakeToyRepository(), fakeSeededRentalRepository());
+      final emitted = <Object>[];
+      final sub = cubit.stream.listen(emitted.add);
+
+      await Future<void>.delayed(const Duration(milliseconds: 1100));
+
+      expect(emitted, isNotEmpty);
+      await sub.cancel();
+      await cubit.close();
+    });
+
     test('recentActivity mixes active + done-today, most recent first, capped at 4', () {
-      final cubit = HomeCubit(fakeToyRepository(), RentalRepository.withDemoSeed());
+      final cubit = HomeCubit(fakeToyRepository(), fakeSeededRentalRepository());
 
       expect(cubit.state.recentActivity, hasLength(4));
       for (var i = 1; i < cubit.state.recentActivity.length; i++) {
@@ -43,7 +55,7 @@ void main() {
     });
 
     test('availableCount sums ComputeToyAvailability across the whole catalog', () {
-      final cubit = HomeCubit(fakeToyRepository(), RentalRepository.withDemoSeed());
+      final cubit = HomeCubit(fakeToyRepository(), fakeSeededRentalRepository());
 
       // carrinho(2,-1)+cama(1)+pula(2,-1)+piscina(1)+patinete(2,-1) = 1+1+1+1+1 = 5
       expect(cubit.state.availableCount, 5);
@@ -53,11 +65,15 @@ void main() {
 
     test('reacts to a new rental in a shared RentalRepository', () {
       final toyRepository = fakeToyRepository();
-      final rentalRepository = RentalRepository();
+      final rentalRepository = fakeRentalRepository();
       final cubit = HomeCubit(toyRepository, rentalRepository);
       final before = cubit.state.activeCount;
 
-      rentalRepository.add(Rental(
+      // `RentalRepository.add` foi removido na spec 026 — `rentals` segue
+      // sendo a mesma lista mutável, só precisa notificar manualmente
+      // (não é um fluxo real de criação, é inserção direta pra testar o
+      // Cubit reagindo a uma mudança externa no Repository).
+      rentalRepository.rentals.add(Rental(
         id: 'r-home-test',
         toyId: 'carrinho',
         childName: 'Teste',
@@ -67,6 +83,7 @@ void main() {
         price: 10,
         status: RentalStatus.active,
       ));
+      rentalRepository.notifyListeners();
 
       expect(cubit.state.activeCount, before + 1);
 
@@ -75,7 +92,7 @@ void main() {
 
     test('shares state with AppState when the same Repositories are injected', () {
       final toyRepository = fakeToyRepository();
-      final rentalRepository = RentalRepository();
+      final rentalRepository = fakeRentalRepository();
       final cubit = HomeCubit(toyRepository, rentalRepository);
       final state = AppState(
         notifications: FakeRentalNotifier(),

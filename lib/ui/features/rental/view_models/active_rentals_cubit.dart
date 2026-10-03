@@ -34,13 +34,15 @@ class ActiveRentalsCubit extends Cubit<ActiveRentalsState> {
           endPayment: null,
           endShowPixQr: false,
           endFrozenPrice: null,
+          now: DateTime.now(),
         )) {
     _rentalRepository.addListener(_onRentalsChanged);
     // Countdown/overtime displays derive their text straight from
     // `DateTime.now()` at build time — nothing about them lives in this
     // Cubit's state — so a plain per-second re-emit is what makes the
     // View rebuild and re-read the clock, same role `AppState._ticker`
-    // already played for this exact screen.
+    // already played for this exact screen. `now` goes into the state so
+    // the re-emit isn't deduplicated away by Equatable.
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) => _onRentalsChanged());
   }
 
@@ -52,7 +54,7 @@ class ActiveRentalsCubit extends Cubit<ActiveRentalsState> {
 
   static List<Rental> _activeOf(List<Rental> rentals) => rentals.where((r) => r.status == RentalStatus.active).toList();
 
-  void _onRentalsChanged() => emit(state.copyWith(activeRentals: _activeOf(_rentalRepository.rentals)));
+  void _onRentalsChanged() => emit(state.copyWith(activeRentals: _activeOf(_rentalRepository.rentals), now: DateTime.now()));
 
   Toy toyById(String id) => _toyRepository.toys.firstWhere((t) => t.id == id, orElse: () => _toyRepository.toys.first);
 
@@ -77,21 +79,27 @@ class ActiveRentalsCubit extends Cubit<ActiveRentalsState> {
   }
 
   /// Adds `addMinutes` to an active fixed-duration rental (spec 008),
-  /// reschedules its two notifications. No-op for `isOpenEnded`.
-  void extendActive(String rentalId, int addMinutes) {
+  /// reschedules its two notifications. No-op for `isOpenEnded`. Deixa
+  /// `ApiUnauthorizedException`/`ApiNetworkException`/`ApiException`
+  /// subir (spec 026) — quem chama decide a UI.
+  Future<void> extendActive(String rentalId, int addMinutes) async {
     final r = _rentalRepository.rentals.firstWhere((r) => r.id == rentalId, orElse: () => _rentalRepository.rentals.first);
     if (r.isOpenEnded) return;
     final rate = r.ratePerMinute ?? ratePerMinute(toyById(r.toyId));
     final newDuration = r.durationMin! + addMinutes;
     final newPrice = ((r.price + rate * addMinutes) * 100).round() / 100;
-    _rentalRepository.extend(rentalId, durationMin: newDuration, price: newPrice);
+    await _rentalRepository.extend(rentalId, durationMin: newDuration, price: newPrice);
     _cancelNotifications(r.id);
     _scheduleRentalEndNotifications(r, toyById(r.toyId), _notifications);
   }
 
-  void cancelActive(String id) {
+  Future<void> cancelActive(String id) async {
+    // Cancela as notificações só depois do backend confirmar — se a
+    // chamada falhar, a locação continua ativa e precisa continuar
+    // avisando (spec 026: ao contrário do SQLite local, isto agora pode
+    // falhar de verdade).
+    await _rentalRepository.cancel(id);
     _cancelNotifications(id);
-    _rentalRepository.removeById(id);
   }
 
   void openEnd(String id) => emit(state.copyWith(endingId: id, endPayment: null, endShowPixQr: false, endFrozenPrice: null));
@@ -115,24 +123,25 @@ class ActiveRentalsCubit extends Cubit<ActiveRentalsState> {
   /// closing the dialog.
   void hidePixQrStep() => emit(state.copyWith(endShowPixQr: false, endFrozenPrice: null));
 
-  /// [actingMonitorName]: quem está no posto quando o encerramento vem de
-  /// [MonitorPostoView] (spec 023-posto-monitor-painel) — `null` em modo
-  /// administrador (call site lê `PostoSessionCubit`, não este Cubit).
-  void confirmEnd({String? actingMonitorName}) {
+  /// Finaliza a locação com sessão de operador real (spec 026 —
+  /// tipicamente só o administrador precisa logar, uma vez por
+  /// aparelho). Deixa a exceção subir pra View decidir a UI; só limpa o
+  /// estado do diálogo em sucesso — falha mantém o diálogo aberto
+  /// (operador não perde o pagamento já selecionado). [actingMonitorName]:
+  /// quem está no posto quando o encerramento vem de [MonitorPostoView]
+  /// (spec 023-posto-monitor-painel) — `null` em modo administrador
+  /// (call site lê `PostoSessionCubit`, não este Cubit).
+  Future<void> confirmEnd({String? actingMonitorName}) async {
     final payment = state.endPayment;
     final id = state.endingId;
     if (payment == null || id == null) return;
     final r = _rentalRepository.rentals.firstWhere((r) => r.id == id);
-    _cancelNotifications(r.id);
     // Reuse the price frozen when the Pix QR was generated, if there was
     // one — never recompute a tempo-corrido price after the QR was
     // already shown.
-    _rentalRepository.finish(
-      r.id,
-      payment,
-      finalPrice: r.isOpenEnded ? (state.endFrozenPrice ?? computeFinalPrice(r)) : null,
-      finishedByMonitorName: actingMonitorName,
-    );
+    final finalPrice = r.isOpenEnded ? (state.endFrozenPrice ?? computeFinalPrice(r)) : null;
+    await _rentalRepository.finish(r.id, payment, finalPrice: finalPrice, finishedByMonitorName: actingMonitorName);
+    _cancelNotifications(r.id);
     emit(state.copyWith(endingId: null, endPayment: null, endFrozenPrice: null));
   }
 

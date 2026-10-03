@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../data/repositories/business_settings_repository.dart';
 import '../../../../domain/formatters.dart';
 import '../../../../domain/models/rental.dart';
 import '../../../../test_keys.dart';
@@ -8,7 +9,6 @@ import '../../../../theme/app_colors.dart';
 import '../../../../widgets/animations/pressable.dart';
 import '../../../../widgets/modal_launchers.dart';
 import '../../business_settings/view_models/business_settings_cubit.dart';
-import '../../posto/view_models/posto_session_cubit.dart';
 import '../view_models/active_rentals_cubit.dart';
 import 'pix_qr_sheet_view.dart';
 
@@ -145,13 +145,23 @@ class EndRentalDialogView extends StatelessWidget {
                           child: ElevatedButton(
                             key: TestKeys.confirmEndButton,
                             onPressed: canConfirm
-                                ? () {
+                                ? () async {
                                     // Pix (spec 004): show the QR before actually
                                     // committing — same dialog route, so it never
                                     // races with `closeEnd()` resetting the ids
                                     // this needs once the QR step confirms.
                                     if (cubit.state.endPayment == PaymentMethod.pix) {
-                                      final settings = context.read<BusinessSettingsCubit>().state.settings;
+                                      // Settings só são buscadas no backend sob
+                                      // demanda (spec 024) — num cold start o
+                                      // Cubit ainda tem o valor vazio padrão, e
+                                      // isso não quer dizer "não configurado".
+                                      // Busca antes de decidir.
+                                      final settingsCubit = context.read<BusinessSettingsCubit>();
+                                      if (settingsCubit.state.status != BusinessSettingsSyncStatus.loaded) {
+                                        await settingsCubit.refresh();
+                                        if (!context.mounted || cubit.state.endingRental == null) return;
+                                      }
+                                      final settings = settingsCubit.state.settings;
                                       if (!settings.isConfigured) {
                                         cubit.closeEnd();
                                         Navigator.of(context).pop();
@@ -164,8 +174,7 @@ class EndRentalDialogView extends StatelessWidget {
                                       cubit.showPixQrStep();
                                       return;
                                     }
-                                    cubit.confirmEnd(actingMonitorName: context.read<PostoSessionCubit>().state.monitorName);
-                                    Navigator.of(context).pop();
+                                    confirmEndRental(context, cubit);
                                   }
                                 : null,
                             style: ElevatedButton.styleFrom(

@@ -417,7 +417,7 @@ void _showToyActionError(BuildContext context, Object error) {
       SnackBar(
         content: const Text('Faça login para editar o catálogo.'),
         duration: const Duration(seconds: 4),
-        action: SnackBarAction(label: 'Entrar', onPressed: () => ensureOperatorSession(context)),
+        action: SnackBarAction(label: 'Entrar', onPressed: loginActionFor(context)),
       ),
     );
     return;

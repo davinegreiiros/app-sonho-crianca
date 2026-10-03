@@ -8,13 +8,13 @@ import '../data/repositories/toy_repository.dart';
 import '../data/services/api_client.dart';
 import '../data/services/business_settings_remote_service.dart';
 import '../data/services/local_rental_notifier.dart';
+import '../data/services/rental_remote_service.dart';
 import '../data/services/toy_remote_service.dart';
 import '../domain/formatters.dart';
 import '../domain/models/business_settings.dart';
 import '../domain/models/rental.dart';
 import '../domain/models/toy.dart';
 import '../domain/rental_notifier.dart';
-import '../domain/use_cases/schedule_rental_end_notifications.dart';
 import '../ui/features/app_shell/view_models/app_shell_state.dart';
 
 export '../ui/features/app_shell/view_models/app_shell_state.dart' show AppTab;
@@ -73,7 +73,11 @@ class AppState extends ChangeNotifier {
               authRepository: AuthRepository(),
             ),
         _ownsToyRepository = toyRepository == null,
-        _rentalRepository = rentalRepository ?? RentalRepository(),
+        _rentalRepository = rentalRepository ??
+            RentalRepository(
+              service: RentalRemoteService(ApiClient()),
+              authRepository: AuthRepository(),
+            ),
         _ownsRentalRepository = rentalRepository == null {
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) => notifyListeners());
     // BusinessSettings ownership moved to BusinessSettingsRepository (spec
@@ -303,68 +307,6 @@ class AppState extends ChangeNotifier {
     return (raw * 100).round() / 100;
   }
 
-  void submitNew() {
-    final d = draft;
-    if (d.childName.trim().isEmpty) return;
-    // RentalRepository.addNew builds the Rental (id, startedAt, status) —
-    // spec 017-migracao-nova-locacao extracted that so NewRentalCubit
-    // doesn't duplicate it. Same fields, same id scheme as before.
-    final rental = _rentalRepository.addNew(
-      toyId: d.toyId,
-      childName: d.childName.trim(),
-      guardianName: d.guardianName.trim().isEmpty ? '—' : d.guardianName.trim(),
-      guardianPhone: d.guardianPhone.trim(),
-      durationMin: d.openEnded ? null : d.durationMin,
-      price: d.openEnded ? 0 : d.price,
-      // Captured once, here — never re-derived from the toy later (see
-      // the field's doc on `Rental`).
-      ratePerMinute: d.openEnded ? (d.customRatePerMinute ?? ratePerMinute(toyById(d.toyId))) : null,
-    );
-    _scheduleEndNotification(rental);
-    showNew = false;
-    notifyListeners();
-  }
-
-  /// Tempo corrido (spec 006) has no target end time to notify about —
-  /// only a fixed-duration rental gets the two notifications below (spec
-  /// 005 + spec 009): the "time's up" one, and a "5 minutes left"
-  /// heads-up before it. Delegates to [ScheduleRentalEndNotifications]
-  /// (spec 017-migracao-nova-locacao) so `NewRentalCubit` doesn't
-  /// duplicate this — same behavior as before, just extracted.
-  static const _scheduleRentalEndNotifications = ScheduleRentalEndNotifications();
-
-  void _scheduleEndNotification(Rental rental) {
-    _scheduleRentalEndNotifications(rental, toyById(rental.toyId), notifications);
-  }
-
-  /// Adds `addMinutes` to an active fixed-duration rental (spec 008): its
-  /// `durationMin` and `price` both grow (price proportionally, at the
-  /// toy's rate/min — same formula as `ratePerMinute`), and both
-  /// notifications (spec 005 "time's up" + spec 009 "5 minutes left") are
-  /// cancelled and rescheduled for the new, later end time. No-op for
-  /// `isOpenEnded` — "tempo corrido" has no fixed duration to extend.
-  void extendActive(String rentalId, int addMinutes) {
-    final r = rentals.firstWhere((r) => r.id == rentalId, orElse: () => rentals.first);
-    if (r.isOpenEnded) return;
-    final rate = r.ratePerMinute ?? ratePerMinute(toyById(r.toyId));
-    final newDuration = r.durationMin! + addMinutes;
-    final newPrice = ((r.price + rate * addMinutes) * 100).round() / 100;
-    // RentalRepository.extend mutates + notifies (spec
-    // 018-migracao-locacao-ativa-encerrar) — before this, mutating `r`
-    // directly here never told RentalRepository's other listeners
-    // (ReportCubit/ToyCatalogCubit) that anything changed.
-    _rentalRepository.extend(rentalId, durationMin: newDuration, price: newPrice);
-    notifications.cancelRentalEnd(r.id);
-    notifications.cancelRentalEndingSoon(r.id);
-    _scheduleEndNotification(r);
-  }
-
-  void cancelActive(String id) {
-    notifications.cancelRentalEnd(id);
-    notifications.cancelRentalEndingSoon(id);
-    _rentalRepository.removeById(id);
-  }
-
   void openEnd(String id) {
     endingId = id;
     endPayment = null;
@@ -409,33 +351,19 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void confirmEnd() {
-    if (endPayment == null || endingId == null) return;
-    final r = rentals.firstWhere((r) => r.id == endingId);
-    notifications.cancelRentalEnd(r.id);
-    notifications.cancelRentalEndingSoon(r.id);
-    // Reuse the price frozen when the Pix QR was generated, if there was
-    // one — never recompute a tempo-corrido price after the QR was
-    // already shown, or the amount charged could exceed what the
-    // customer's bank app actually scanned.
-    // RentalRepository.finish mutates + notifies (spec
-    // 018-migracao-locacao-ativa-encerrar — same fix as extendActive).
-    _rentalRepository.finish(
-      r.id,
-      endPayment!,
-      finalPrice: r.isOpenEnded ? (endFrozenPrice ?? computeFinalPrice(r)) : null,
-    );
-    endingId = null;
-    endPayment = null;
-    endFrozenPrice = null;
-    notifyListeners();
-  }
-
   // ToyRepository mutations (addToy/updateToyPrice/updateToyBlock/
   // removeToy/toyHasRentals) removidas na spec 025-catalogo-sessao-
   // dispositivo: sem chamador desde que catalog_view.dart/
   // add_toy_sheet_view.dart migraram pra ToyCatalogCubit (specs 012/015).
   // Virar `Future` só pra ninguém `await`-ar seria manter morto, não migrar.
+  //
+  // RentalRepository mutations (submitNew/extendActive/cancelActive/
+  // confirmEnd) removidas na spec 026-rental-via-backend: viraram `Future`
+  // + exigem sessão de operador real, incompatível com a forma síncrona
+  // que `AppState` sempre teve. Mesmo motivo acima — sem chamador em
+  // produção desde a migração pra `NewRentalCubit`/`ActiveRentalsCubit`
+  // (specs 017/018); só testes legados chamavam direto, migrados pros
+  // Cubits reais.
 
   // ------------------------------ derived data ------------------------------
 

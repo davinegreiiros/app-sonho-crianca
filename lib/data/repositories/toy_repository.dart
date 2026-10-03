@@ -13,11 +13,10 @@ import 'auth_repository.dart';
 /// `lib/ui/features/catalog/`) and by outros Cubits que só leem `toys`
 /// (home, report, posto, admin panel).
 ///
-/// Duas sessões diferentes (spec 025, ver `specs/025-.../spec.md` —
-/// "Decisão — sessão de dispositivo"): [load] (leitura, todo mundo,
-/// inclusive o posto sem conta) usa `AuthRepository.deviceToken`; as
-/// mutações (escrita, só administrador) usam `AuthRepository.token` — a
-/// sessão de operador real.
+/// Uma sessão só (spec 027-login-admin-sessao, revisando a "sessão de
+/// dispositivo" da 025): leitura e escrita usam `AuthRepository.token`, a
+/// sessão do administrador — salva no aparelho, então o posto sem conta
+/// continua lendo o catálogo depois que o administrador volta pros postos.
 class ToyRepository extends ChangeNotifier {
   ToyRepository({required ToyRemoteService service, required AuthRepository authRepository})
       : _service = service,
@@ -34,25 +33,22 @@ class ToyRepository extends ChangeNotifier {
   /// `await` em voo pode resolver depois deste já ter sido descartado.
   bool _disposed = false;
 
-  /// Busca o catálogo no backend com a sessão de dispositivo. Nunca
-  /// propaga erro: sem rede, sem `deviceToken` configurado nesta build, ou
-  /// 401 (token de 12h expirado — tenta relogar uma vez) deixam o catálogo
-  /// como estava (seed inicial ou último fetch bom). Catálogo é o fluxo
-  /// principal do posto (spec 023) — não pode travar nem ficar em branco
-  /// por causa de conectividade (spec 025, cenário 4).
-  Future<void> load() => _load(retriedAfterRelogin: false);
-
-  Future<void> _load({required bool retriedAfterRelogin}) async {
+  /// Busca o catálogo no backend com a sessão do administrador. Nunca
+  /// propaga erro: sem sessão (não chama nada), sem rede ou 401 deixam o
+  /// catálogo como estava (seed inicial ou último fetch bom); 401 ainda
+  /// derruba a sessão (token vencido/revogado — spec 027, cenário 8).
+  /// Catálogo é o fluxo principal do posto (spec 023) — não pode travar
+  /// nem ficar em branco por causa de conectividade (spec 025, cenário 4).
+  Future<void> load() async {
+    final token = _authRepository.token;
+    if (token == null) return;
     try {
-      final loaded = await _service.loadAll(token: _authRepository.deviceToken);
+      final loaded = await _service.loadAll(token: token);
       if (_disposed) return;
       _toys = loaded;
       notifyListeners();
     } on ApiUnauthorizedException {
-      if (retriedAfterRelogin || _disposed) return;
-      await _authRepository.loginDevice();
-      if (_disposed) return;
-      await _load(retriedAfterRelogin: true);
+      if (!_disposed) await _authRepository.logout();
     } catch (_) {
       // Sem rede, backend fora — mantém o catálogo que já tinha, silencioso.
     }
@@ -71,16 +67,22 @@ class ToyRepository extends ChangeNotifier {
     required ToyCategory category,
     int qty = 1,
   }) async {
-    final toy = await _service.create(
-      name: name,
-      qty: qty,
-      blockMin: blockMin,
-      price: price,
-      ink: ink,
-      imageKey: imageKey,
-      category: category,
-      token: _authRepository.token,
-    );
+    final Toy toy;
+    try {
+      toy = await _service.create(
+        name: name,
+        qty: qty,
+        blockMin: blockMin,
+        price: price,
+        ink: ink,
+        imageKey: imageKey,
+        category: category,
+        token: _authRepository.token,
+      );
+    } catch (e) {
+      await _dropSessionIfUnauthorized(e);
+      rethrow;
+    }
     if (!_disposed) {
       _toys = [..._toys, toy];
       notifyListeners();
@@ -127,6 +129,7 @@ class ToyRepository extends ChangeNotifier {
         _toys = previous;
         notifyListeners();
       }
+      await _dropSessionIfUnauthorized(e);
       rethrow;
     }
   }
@@ -145,8 +148,15 @@ class ToyRepository extends ChangeNotifier {
         _toys = previous;
         notifyListeners();
       }
+      await _dropSessionIfUnauthorized(e);
       rethrow;
     }
+  }
+
+  /// 401 numa escrita = token vencido/revogado no servidor: derruba a
+  /// sessão local pra próxima ação pedir login (spec 027, cenário 8).
+  Future<void> _dropSessionIfUnauthorized(Object error) async {
+    if (error is ApiUnauthorizedException && !_disposed) await _authRepository.logout();
   }
 
   @override

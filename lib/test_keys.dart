@@ -40,6 +40,7 @@ class TestKeys {
   static const businessCityField = ValueKey('business_city_field');
   static const businessPixKeyField = ValueKey('business_pix_key_field');
   static const saveBusinessSettingsButton = ValueKey('save_business_settings_button');
+  static const manageToysButton = ValueKey('manage_toys_button');
   static const pixQrImage = ValueKey('pix_qr_image');
   static const copyPixPayloadButton = ValueKey('copy_pix_payload_button');
   static const pixQrDoneButton = ValueKey('pix_qr_done_button');
@@ -59,10 +60,22 @@ class TestKeys {
   static const adminPanelButton = ValueKey('admin_panel_button');
   static const adminPanelBackButton = ValueKey('admin_panel_back_button');
 
+  // Menu do administrador (spec 027-login-admin-sessao)
+  static const adminMenuButton = ValueKey('admin_menu_button');
+  static const adminBackToPostosItem = ValueKey('admin_back_to_postos_item');
+  static const adminLogoutItem = ValueKey('admin_logout_item');
+  static const adminLogoutConfirmButton = ValueKey('admin_logout_confirm_button');
+
   // Login de operador (spec 024-sync-backend-fundacao)
   static const loginUsernameField = ValueKey('login_username_field');
   static const loginPasswordField = ValueKey('login_password_field');
   static const loginSubmitButton = ValueKey('login_submit_button');
   static const loginErrorText = ValueKey('login_error_text');
   static const loginBackButton = ValueKey('login_back_button');
+
+  // Relatório do dono (spec 028-relatorio-dono-whatsapp)
+  static ValueKey reportPeriod(String period) => ValueKey('report_period_$period');
+  static const reportShareButton = ValueKey('report_share_button');
+  static const reportMonitorSection = ValueKey('report_monitor_section');
+  static const reportCashSection = ValueKey('report_cash_section');
 }

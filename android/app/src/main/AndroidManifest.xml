@@ -10,8 +10,13 @@
          build debug/profile (manifests próprios) alcança a API — o release
          falharia toda chamada como "sem conexão". -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- allowBackup=false (spec 027-login-admin-sessao): a sessão do
+         administrador fica em SharedPreferences (texto puro); sem isto o
+         Auto Backup do Android levaria o token pra nuvem e o restauraria
+         em outro aparelho. -->
     <application
-        android:label="sonho_de_crianca"
+        android:allowBackup="false"
+        android:label="Sonho de Criança"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

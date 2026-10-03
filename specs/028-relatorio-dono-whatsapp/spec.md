@@ -1,7 +1,9 @@
 # Spec: Relatório do dono + envio pelo WhatsApp
 
-Status: Approved
+Status: Implemented
 Criado: 2026-10-02
+
+Escrita como "026" sobre a `main`; renumerada pra 028 ao ser levada pra `develop`, onde 026 ([rental-via-backend](../026-rental-via-backend/spec.md)) e 027 já existiam.
 
 ## Problema
 
@@ -17,11 +19,11 @@ Na aba de faturamento, o administrador escolhe Hoje, Semana ou Mês, vê o total
 
 ## Fora de escopo
 
-- **Juntar dados de vários aparelhos.** `Rental` e `Turno` ainda moram só no SQLite de cada aparelho ([020](../020-persistencia-local/spec.md); a migração de `Rental` pro backend é a spec seguinte da [025](../025-catalogo-sessao-dispositivo/spec.md)). Cada aparelho gera o relatório do que aconteceu nele. Com um tablet só na praça (cenário assumido na 023), isso já é o negócio inteiro.
+- **Juntar turnos de vários aparelhos.** Desde a [026](../026-rental-via-backend/spec.md), `Rental` vem do backend, então faturamento, pagamento, brinquedo e monitor já somam todos os aparelhos. `Turno` ainda é local (SQLite, [020](../020-persistencia-local/spec.md)): a seção de caixa mostra só os turnos fechados no aparelho que gera o relatório. Com um tablet só na praça (cenário assumido na 023), isso já é o negócio inteiro.
 - **PDF.** Texto primeiro: abre em qualquer celular, não precisa de app de PDF e cabe numa mensagem. PDF fica pra spec futura se a cliente pedir.
 - **Envio automático** (ex.: todo dia às 20h sem ninguém tocar). Envio é sempre ação manual do administrador.
 - **Número de WhatsApp fixo/cadastrado.** O app abre a folha de compartilhamento do sistema; quem escolhe o contato é a pessoa.
-- **Locações canceladas no relatório.** Cancelar ainda apaga a locação (decisão registrada na 023); não há o que contar.
+- **Locações canceladas no relatório.** Desde a 026, cancelar marca a locação `done` sem forma de pagamento; ela continua fora do faturamento (mesmo filtro `isCompleted` que o relatório já usa) e não ganha seção própria.
 - **Mudar o painel administrativo (3d).** Continua sendo a visão "agora/hoje" ao vivo; esta spec mexe só na aba de faturamento.
 - **Período personalizado** (escolher datas no calendário).
 
@@ -72,16 +74,16 @@ Na aba de faturamento, o administrador escolhe Hoje, Semana ou Mês, vê o total
 
 ## Critérios de aceite
 
-- [ ] Seletor de período com Hoje / Semana / Mês / Tudo; Semana começa segunda 00:00, Mês começa dia 1 00:00 (hora local do aparelho).
-- [ ] Total, por pagamento, por brinquedo e histórico continuam funcionando em todos os períodos (paridade com a 014 para Hoje e Tudo).
-- [ ] Seção "Por monitor" agrupando por quem recebeu o pagamento; sem monitor = "Administrador"; soma das linhas = total.
-- [ ] Seção de caixa com turnos fechados no período que tiveram diferença, saldo somado, e mensagem própria quando tudo bateu.
-- [ ] Regra de "esperado em dinheiro" do turno idêntica à do fechamento de turno (3c), coberta por teste que compara os dois.
-- [ ] Botão "Enviar resumo" abre a folha de compartilhamento do sistema com o texto do período atual.
-- [ ] Texto gerado nunca contém `childName`, `guardianName` nem `guardianPhone` (teste dedicado).
-- [ ] Texto para período vazio é legível e diz que não houve locações.
-- [ ] Nenhuma permissão nova no Android/iOS.
-- [ ] `flutter analyze` limpo; testes novos em `test/` cobrindo períodos, agrupamento por monitor, caixa, texto e ausência de dado pessoal. Testes existentes do relatório continuam passando (ajustados só onde "14 dias" virou "Semana").
+- [x] Seletor de período com Hoje / Semana / Mês / Tudo; Semana começa segunda 00:00, Mês começa dia 1 00:00 (hora local do aparelho).
+- [x] Total, por pagamento, por brinquedo e histórico continuam funcionando em todos os períodos (paridade com a 014 para Hoje e Tudo).
+- [x] Seção "Por monitor" agrupando por quem recebeu o pagamento; sem monitor = "Administrador"; soma das linhas = total.
+- [x] Seção de caixa com turnos fechados no período que tiveram diferença, saldo somado, e mensagem própria quando tudo bateu.
+- [x] Regra de "esperado em dinheiro" do turno idêntica à do fechamento de turno (3c), coberta por teste que compara os dois.
+- [x] Botão "Enviar resumo" abre a folha de compartilhamento do sistema com o texto do período atual.
+- [x] Texto gerado nunca contém `childName`, `guardianName` nem `guardianPhone` (teste dedicado).
+- [x] Texto para período vazio é legível e diz que não houve locações.
+- [x] Nenhuma permissão nova no Android/iOS.
+- [x] `flutter analyze` limpo; testes novos em `test/` cobrindo períodos, agrupamento por monitor, caixa, texto e ausência de dado pessoal. Testes existentes do relatório continuam passando (ajustados só onde "14 dias" virou "Semana").
 
 ## Requisitos não-funcionais
 

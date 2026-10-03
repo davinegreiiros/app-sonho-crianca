@@ -1,16 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../data/repositories/auth_repository.dart';
 import '../data/repositories/toy_repository.dart';
+import '../test_keys.dart';
 import '../theme/app_colors.dart';
 import '../ui/features/admin_panel/views/admin_panel_view.dart';
 import '../ui/features/business_settings/views/business_settings_view.dart';
 import '../ui/features/catalog/views/add_toy_sheet_view.dart';
+import '../ui/features/posto/view_models/posto_session_cubit.dart';
 import '../ui/features/rental/view_models/active_rentals_cubit.dart';
 import '../ui/features/rental/view_models/new_rental_cubit.dart';
 import '../ui/features/rental/views/end_rental_dialog_view.dart';
 import '../ui/features/rental/views/new_rental_sheet_view.dart';
 import 'auth_gate.dart';
+import 'rental_action_error.dart';
 
 /// Opens the "Nova locação" form as a real modal bottom sheet — slides up
 /// from the bottom with the framework's own transition, dims the
@@ -79,12 +83,33 @@ Future<void> showEndRentalDialog(BuildContext context, String rentalId) async {
   cubit.closeEnd();
 }
 
+/// Confirma o fim da locação (spec 026-rental-via-backend — "login fica
+/// só com o administrador") — chamado por `EndRentalDialogView`
+/// (pagamento não-Pix) e `PixQrSheetView` (depois do QR). Sempre checa
+/// sessão real; como ela persiste no aparelho, só o administrador
+/// costuma vê-la de fato (uma vez, ao configurar o aparelho) — nenhum
+/// monitor rotativo precisa logar depois disso. `actingMonitorName`
+/// (rótulo local de quem está no posto, `null` em modo administrador)
+/// é só pra `finishedByMonitorName`, nunca pra autenticar nada. Falha
+/// mantém o diálogo aberto (não finge sucesso, não perde a forma de
+/// pagamento já escolhida).
+Future<void> confirmEndRental(BuildContext context, ActiveRentalsCubit cubit) async {
+  if (!await ensureOperatorSession(context)) return;
+  if (!context.mounted) return;
+  final actingMonitorName = context.read<PostoSessionCubit>().state.monitorName;
+  try {
+    await cubit.confirmEnd(actingMonitorName: actingMonitorName);
+    if (context.mounted) Navigator.of(context).pop();
+  } catch (e) {
+    if (context.mounted) showRentalActionError(context, e);
+  }
+}
+
 /// Opens the "Adicionar brinquedo" form as a modal bottom sheet.
 ///
 /// Guarda de login (spec 025-catalogo-sessao-dispositivo): criar brinquedo
-/// grava autoria de operador real (não a sessão de dispositivo, que só
-/// lê) — mesma guarda de [openBusinessSettingsScreen], reaproveitada via
-/// `ensureOperatorSession`.
+/// grava autoria do administrador — mesma guarda de
+/// [openBusinessSettingsScreen], reaproveitada via `ensureOperatorSession`.
 Future<void> showAddToySheet(BuildContext context) async {
   if (!await ensureOperatorSession(context)) return;
   if (!context.mounted) return;
@@ -132,4 +157,38 @@ Future<void> openAdminPanelScreen(BuildContext context) {
   return Navigator.of(context).push<void>(
     MaterialPageRoute(builder: (context) => const AdminPanelView()),
   );
+}
+
+/// "Sair da conta" do menu do administrador (spec 027-login-admin-sessao):
+/// confirma, apaga a sessão (memória + `SharedPreferences`) e volta pra
+/// escolha de posto. Depois disso o posto fica sem sessão — a próxima
+/// locação pede login, como num aparelho recém-instalado.
+Future<void> confirmAdminLogout(BuildContext context) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      backgroundColor: AppColors.bg,
+      title: const Text('Sair da conta?'),
+      content: const Text(
+        'O aparelho fica sem login de administrador. Para registrar locação nos postos, '
+        'alguém vai precisar entrar de novo.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('Cancelar'),
+        ),
+        TextButton(
+          key: TestKeys.adminLogoutConfirmButton,
+          onPressed: () => Navigator.of(context).pop(true),
+          style: TextButton.styleFrom(foregroundColor: AppColors.accent2_700),
+          child: const Text('Sair'),
+        ),
+      ],
+    ),
+  );
+  if (confirmed != true || !context.mounted) return;
+  final postoSessionCubit = context.read<PostoSessionCubit>();
+  await context.read<AuthRepository>().logout();
+  postoSessionCubit.exitToSelection();
 }
