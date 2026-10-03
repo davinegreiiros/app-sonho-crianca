@@ -15,6 +15,7 @@ import 'data/services/business_settings_remote_service.dart';
 import 'data/services/rental_remote_service.dart';
 import 'data/services/toy_remote_service.dart';
 import 'data/services/turno_local_service.dart';
+import 'domain/text_sharer.dart';
 import 'screens/home_shell.dart';
 import 'state/app_state.dart';
 import 'theme/app_theme.dart';
@@ -105,6 +106,7 @@ class SonhoDeCriancaApp extends StatelessWidget {
     this.toyRepository,
     this.rentalRepository,
     this.turnoRepository,
+    this.textSharer,
     this.startInPostoAdminMode = false,
   });
 
@@ -113,6 +115,10 @@ class SonhoDeCriancaApp extends StatelessWidget {
   final ToyRepository? toyRepository;
   final RentalRepository? rentalRepository;
   final TurnoRepository? turnoRepository;
+
+  /// Saída do "Enviar resumo" do relatório (spec 028). `null` = folha de
+  /// compartilhamento real; teste passa um fake.
+  final TextSharer? textSharer;
   final bool startInPostoAdminMode;
 
   @override
@@ -175,7 +181,12 @@ class SonhoDeCriancaApp extends StatelessWidget {
                 create: (context) => ToyCatalogCubit(context.read<ToyRepository>(), context.read<RentalRepository>()),
               ),
               BlocProvider<ReportCubit>(
-                create: (context) => ReportCubit(context.read<RentalRepository>(), context.read<ToyRepository>()),
+                create: (context) => ReportCubit(
+                  context.read<RentalRepository>(),
+                  context.read<ToyRepository>(),
+                  turnoRepository: context.read<TurnoRepository>(),
+                  textSharer: textSharer,
+                ),
               ),
               BlocProvider<NewRentalCubit>(
                 create: (context) => NewRentalCubit(context.read<ToyRepository>(), context.read<RentalRepository>()),
